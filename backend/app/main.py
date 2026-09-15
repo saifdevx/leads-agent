@@ -1,0 +1,101 @@
+import logging
+import time
+import uuid
+
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+
+from app.api.health import router as health_router
+from app.core.config import get_settings
+from app.core.logging import configure_logging
+
+settings = get_settings()
+configure_logging(settings.log_level)
+logger = logging.getLogger("lead_platform.api")
+
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.app_version,
+    docs_url="/docs" if settings.app_env != "production" else None,
+    redoc_url=None,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origin_list,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["*"],
+)
+
+
+@app.middleware("http")
+async def request_context(request: Request, call_next):
+    request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    request.state.request_id = request_id
+    start = time.perf_counter()
+
+    response = await call_next(request)
+    response.headers["X-Request-ID"] = request_id
+
+    logger.info(
+        "%s %s -> %s in %.1fms",
+        request.method,
+        request.url.path,
+        response.status_code,
+        (time.perf_counter() - start) * 1000,
+        extra={"request_id": request_id},
+    )
+    return response
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": "http_error",
+                "message": str(exc.detail),
+                "request_id": getattr(request.state, "request_id", None),
+            }
+        },
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    return JSONResponse(
+        status_code=422,
+        content={
+            "error": {
+                "code": "validation_error",
+                "message": "The request contains invalid data.",
+                "request_id": getattr(request.state, "request_id", None),
+                "details": exc.errors(),
+            }
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def unexpected_exception_handler(request: Request, exc: Exception):
+    logger.exception(
+        "Unhandled request error",
+        extra={"request_id": getattr(request.state, "request_id", None)},
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "internal_error",
+                "message": "Something went wrong while processing the request.",
+                "request_id": getattr(request.state, "request_id", None),
+            }
+        },
+    )
+
+
+app.include_router(health_router)
