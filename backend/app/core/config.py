@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Lead Platform API"
-    app_version: str = "0.1.0"
+    app_version: str = "0.1.1"
     app_env: str = "development"
     cors_origins: str = "http://localhost:5173"
     log_level: str = "INFO"

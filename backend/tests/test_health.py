@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+from app.core.config import get_settings
 from app.main import app
 
 client = TestClient(app)
@@ -12,7 +13,7 @@ def test_health_endpoint_returns_structured_payload():
     data = response.json()
     assert data["status"] == "ok"
     assert data["service"] == "lead-platform-api"
-    assert data["version"] == "0.1.0"
+    assert data["version"] == get_settings().app_version
     assert data["request_id"]
     assert response.headers["X-Request-ID"] == data["request_id"]
 
