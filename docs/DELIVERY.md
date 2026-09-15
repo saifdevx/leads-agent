@@ -1,72 +1,58 @@
-# Delivery Notes — v0.1.0
+# Delivery Notes — v0.1.1
 
 ## VERSION
-`0.1.0`
+`0.1.1`
 
 ## PURPOSE
-Create the smallest working foundation for the simplified lead-generation product before authentication, database, providers, AI, or email automation are introduced.
-
-## ADD
-Everything in this ZIP is new for Checkpoint 1.
+Fix the Windows frontend install failure caused when npm omits Rolldown's platform-specific native optional dependency.
 
 ## REPLACE
-Nothing. This is the first code release.
+Use this ZIP as the full Checkpoint 1 replacement.
 
 ## KEEP
-Keep the approved Checkpoint 0 product decisions and the simplified product flow:
+- Your existing local backend `.env`
+- Any local frontend `.env` values
+- All Checkpoint 0 product decisions
 
-1. Find Leads
-2. Review Leads
-3. Contact Leads
+## CHANGED
+- `frontend/package.json`
+- `frontend/.npmrc` (new)
+- `README.md`
+- `CHANGELOG.md`
+- `render.yaml`
+- version documentation
 
-## BACKUP
-Keep this ZIP unchanged and commit/tag it as `v0.1.0` before installing Checkpoint 2.
+## UNCHANGED
+- React application source
+- FastAPI source
+- API contract
+- UI design
 
-## DEPENDENCIES
-Frontend dependencies are pinned in `frontend/package.json`.
-Backend dependencies are pinned in `backend/requirements.txt`.
+## INSTALL — WINDOWS HOTFIX
 
-## ENVIRONMENT CHANGES
-Create local `.env` files from the included `.env.example` templates. Do not commit real `.env` files.
-
-## DATABASE CHANGES
-None. Turso begins in a later checkpoint.
-
-## INSTALL
-Follow the root `README.md` exactly.
-
-## TEST
-Run:
-
-```bash
-cd backend
-pytest -q
+```powershell
+cd frontend
+Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
+Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
+npm cache verify
+npm install --include=optional
+npm run dev
 ```
 
-Then:
+## TEST
 
-```bash
-cd frontend
+```powershell
 npm run check
 npm run test
 npm run build
 ```
 
-Also complete `docs/TEST_CHECKLIST.md`.
+Backend regression:
 
-## EXPECTED RESULT
-- Backend `/health` returns HTTP 200.
-- Frontend loads the simplified product shell.
-- Top-right API status changes to `API connected` when backend is running.
-- Four navigation items work.
-- No screen pretends unfinished lead-search functionality exists.
-
-## KNOWN LIMITATIONS
-- No authentication yet.
-- No database yet.
-- No live lead search yet.
-- No AI or provider connections yet.
-- No email sending yet.
+```powershell
+cd ..\backend
+pytest -q
+```
 
 ## ROLLBACK
 See `docs/ROLLBACK.md`.

@@ -1,4 +1,4 @@
-# Checkpoint 1 Test Checklist
+# Checkpoint 1 v0.1.1 Test Checklist
 
 ## Clean-install checks
 
@@ -9,7 +9,8 @@
 - [ ] `GET /health` returns HTTP 200
 - [ ] Response includes `status`, `service`, `version`, `environment`, `timestamp`, `request_id`
 - [ ] `X-Request-ID` response header is present
-- [ ] Frontend `npm install` completes
+- [ ] Frontend clean install with `npm install --include=optional` completes
+- [ ] `node_modules/@rolldown/binding-win32-x64-msvc` exists on Windows x64
 - [ ] `npm run check` passes
 - [ ] `npm run test` passes
 - [ ] `npm run build` passes

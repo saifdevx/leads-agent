@@ -1,4 +1,4 @@
-# Lead Platform v0.1.0 — Checkpoint 1
+# Lead Platform v0.1.1 — Checkpoint 1 Hotfix
 
 This is the working foundation for the simplified lead-generation web app.
 
@@ -86,7 +86,7 @@ Open a second terminal:
 
 ```bash
 cd frontend
-npm install
+npm install --include=optional
 cp .env.example .env
 npm run dev
 ```
@@ -96,6 +96,26 @@ Open:
 `http://localhost:5173`
 
 The top-right status should change from **Connecting** to **API connected**.
+
+
+## Windows npm / Rolldown hotfix
+
+`v0.1.1` hardens the frontend install against npm occasionally omitting Rolldown's platform-specific optional package on Windows.
+
+If you previously installed `v0.1.0` and saw `Cannot find native binding` or `@rolldown/binding-win32-x64-msvc`, do a clean frontend reinstall in PowerShell:
+
+```powershell
+cd frontend
+Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
+Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
+npm cache verify
+npm install --include=optional
+npm run dev
+```
+
+The project standard remains Node `22.16.0` (see `.node-version`). Node 24 is supported by Vite's engine range, but using the pinned project Node version gives us a more reproducible development environment.
+
+Do **not** change the backend for this hotfix; your existing backend is already healthy.
 
 ## Tests
 

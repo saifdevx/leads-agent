@@ -1,28 +1,25 @@
-# Project Handoff — v0.1.0
+# Project Handoff — v0.1.1
 
 ## Project
 Lead Platform
 
 ## Current checkpoint
-Checkpoint 1 — Foundation
+Checkpoint 1 — Foundation, Windows install hotfix
 
 ## What works
-- React/Vite frontend shell
-- Locked visual system
-- Simplified navigation
-- Responsive layout
-- FastAPI server
-- Health endpoint
-- Frontend/backend health connection
-- Structured errors/request IDs/logging baseline
+- FastAPI backend and `/health` endpoint verified in the user's Windows environment
+- `/docs` and `/openapi.json` verified
+- Frontend source unchanged from v0.1.0
+- Frontend dependency installation hardened for Rolldown optional native binding
 
 ## Current stack
 - React 19.3
 - Vite 8.3
+- Rolldown 1.2.8 pinned
 - TypeScript 6.0
 - Tailwind CSS 4.3
 - FastAPI 0.141.x
-- Python 3.13 baseline
+- Project Node baseline 22.16.0
 
 ## Data
 No database yet.
@@ -33,23 +30,5 @@ No authentication yet.
 ## Providers
 No external providers yet.
 
-## Environment variables
-Frontend:
-- `VITE_API_URL`
-
-Backend:
-- `APP_NAME`
-- `APP_VERSION`
-- `APP_ENV`
-- `CORS_ORIGINS`
-- `LOG_LEVEL`
-
-## Do not change casually
-- Simplified four-item navigation philosophy
-- Brand color tokens
-- Frontend/backend separation
-- Structured `/health` contract
-- Request ID behavior
-
 ## Next checkpoint
-Checkpoint 2 — Firebase authentication.
+Checkpoint 2 — Firebase authentication, only after frontend dev/check/test/build all pass.

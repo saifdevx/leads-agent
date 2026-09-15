@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.1.1 — Windows frontend install hotfix
+
+### Fixed
+- Hardened Windows installs against npm optional-dependency omission for Rolldown.
+- Explicitly pins `rolldown` 1.2.8 for Vite 8.3.x compatibility.
+- Adds the Windows x64 Rolldown native binding as an optional dependency.
+- Adds `.npmrc` with optional dependencies explicitly enabled.
+- Render frontend install now explicitly includes optional dependencies.
+
+### Preserved
+- No application UI code changed.
+- No backend code changed.
+- No API contract changed.
+- No database/authentication changes.
+
 ## 0.1.0 — Checkpoint 1 Foundation
 
 ### Added
