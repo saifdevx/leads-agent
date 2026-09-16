@@ -1,34 +1,60 @@
-# Project Handoff — v0.1.1
+# Version Handoff
 
-## Project
-Lead Platform
+PROJECT: Lead Platform
+CURRENT VERSION: 0.2.0
+CURRENT CHECKPOINT: 2 — Firebase Authentication
 
-## Current checkpoint
-Checkpoint 1 — Foundation, Windows install hotfix
+## WHAT WORKS
 
-## What works
-- FastAPI backend and `/health` endpoint verified in the user's Windows environment
-- `/docs` and `/openapi.json` verified
-- Frontend source unchanged from v0.1.0
-- Frontend dependency installation hardened for Rolldown optional native binding
+- React/Vite/Tailwind application shell
+- FastAPI health/API foundation
+- Windows Rolldown installation hardening from v0.1.1
+- Firebase email/password registration and login
+- Firebase Google sign-in
+- Firebase password reset
+- Firebase logout/session restoration
+- Protected frontend shell
+- Backend Firebase Admin token verification
+- Protected `/api/v1/auth/me`
 
-## Current stack
+## CURRENT STACK
+
 - React 19.3
 - Vite 8.3
-- Rolldown 1.2.8 pinned
 - TypeScript 6.0
 - Tailwind CSS 4.3
-- FastAPI 0.141.x
-- Project Node baseline 22.16.0
+- Firebase JS SDK 12.19.0
+- FastAPI 0.141.1
+- Firebase Admin Python 7.5.0
 
-## Data
-No database yet.
+## DATA
 
-## Authentication
-No authentication yet.
+No application database yet. Firebase is used only for authentication in this checkpoint.
 
-## Providers
-No external providers yet.
+## AUTH
 
-## Next checkpoint
-Checkpoint 2 — Firebase authentication, only after frontend dev/check/test/build all pass.
+Firebase Authentication. Frontend obtains Firebase ID token; FastAPI independently verifies it before protected application access.
+
+## DO NOT CHANGE WITHOUT A CHECKPOINT
+
+- Simplified 4-item user navigation
+- Free-first product direction
+- Frontend/backend separation
+- Server-side auth verification requirement
+- Secret handling rules
+
+## KNOWN LIMITATIONS
+
+- No Turso user record yet
+- No role/admin claims yet
+- No lead discovery yet
+- No email verification enforcement
+- No production deployment validation yet
+
+## NEXT CHECKPOINT
+
+Checkpoint 3 — Turso database foundation with a deliberately small schema tied to Firebase UID.
+
+## ROLLBACK
+
+Git tag `v0.1.1`.

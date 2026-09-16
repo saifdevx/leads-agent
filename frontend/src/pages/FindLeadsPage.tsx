@@ -81,10 +81,10 @@ export function FindLeadsPage({ onFoundationAction }: Props) {
 
         <div className="mt-7 flex flex-col gap-3 border-t border-[#ECECF1] pt-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="max-w-[480px] text-xs leading-5 text-[#777A87]">
-            Checkpoint 1 validates the product shell only. Live search is intentionally not enabled until the lead-discovery checkpoint.
+            Checkpoint 2 adds secure accounts only. Live lead search stays disabled until the lead-discovery checkpoint.
           </p>
           <button
-            onClick={() => onFoundationAction('Lead search is intentionally disabled in v0.1.0. The interface and API foundation are working.')}
+            onClick={() => onFoundationAction('Lead search is intentionally disabled in v0.2.0. Authentication and the application foundation are working.')}
             className="focus-ring inline-flex h-11 shrink-0 items-center justify-center gap-2 rounded-[10px] bg-[#7B61FF] px-5 text-sm font-bold text-white shadow-[0_8px_20px_rgba(123,97,255,0.22)] transition hover:bg-[#6E53F0]"
           >
             Find Leads

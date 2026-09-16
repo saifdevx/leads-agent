@@ -7,14 +7,20 @@ type Props = {
   eyebrow?: string
   healthStatus: 'loading' | 'online' | 'offline'
   onOpenMenu: () => void
+  userName?: string | null
+  userEmail?: string | null
+  onSignOut: () => Promise<void>
   children: ReactNode
 }
 
-export function PageShell({ title, eyebrow, healthStatus, onOpenMenu, children }: Props) {
+export function PageShell({ title, eyebrow, healthStatus, onOpenMenu, userName, userEmail, onSignOut, children }: Props) {
+  const label = userName || userEmail || 'Account'
+  const initial = label.trim().charAt(0).toUpperCase() || 'U'
+
   return (
     <main className="min-h-screen lg:pl-[238px]">
       <header className="sticky top-0 z-20 border-b border-[#E7E7ED] bg-[#F7F7FA]/92 backdrop-blur-xl">
-        <div className="mx-auto flex h-[68px] max-w-[1460px] items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-[68px] max-w-[1460px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div className="flex min-w-0 items-center gap-3">
             <button onClick={onOpenMenu} className="focus-ring rounded-lg border border-[#E3E3E9] bg-white p-2 text-[#4B4F5E] lg:hidden" aria-label="Open navigation">
               <Icon name="menu" className="h-5 w-5" />
@@ -24,7 +30,27 @@ export function PageShell({ title, eyebrow, healthStatus, onOpenMenu, children }
               <h1 className="truncate font-display text-[19px] font-bold tracking-[-0.02em] text-[#14151C] sm:text-[21px]">{title}</h1>
             </div>
           </div>
-          <StatusBadge status={healthStatus} />
+
+          <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+            <StatusBadge status={healthStatus} />
+            <div className="hidden h-7 w-px bg-[#E0E0E7] sm:block" />
+            <div className="flex min-w-0 items-center gap-2">
+              <div className="grid h-8 w-8 shrink-0 place-items-center rounded-[9px] bg-[#EDE9FF] text-xs font-extrabold text-[#654BD9]">{initial}</div>
+              <div className="hidden min-w-0 md:block">
+                <div className="max-w-[170px] truncate text-xs font-bold text-[#30323A]">{label}</div>
+                {userName && userEmail && <div className="max-w-[170px] truncate text-[10px] text-[#858894]">{userEmail}</div>}
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => void onSignOut()}
+              className="focus-ring rounded-[9px] border border-[#E2E2E8] bg-white p-2 text-[#686B77] transition hover:bg-[#FAFAFC] hover:text-[#3B3D45]"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <Icon name="logout" className="h-4 w-4" />
+            </button>
+          </div>
         </div>
       </header>
 

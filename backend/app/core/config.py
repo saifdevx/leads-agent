@@ -5,10 +5,13 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Lead Platform API"
-    app_version: str = "0.1.1"
+    app_version: str = "0.2.0"
     app_env: str = "development"
     cors_origins: str = "http://localhost:5173"
     log_level: str = "INFO"
+    firebase_project_id: str = ""
+    firebase_credentials_path: str = ""
+    firebase_service_account_json: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

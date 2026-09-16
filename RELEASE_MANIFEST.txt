@@ -1,41 +1,75 @@
-6fa3fc33a4b11825cf2b9e730b16eb0970a4adea45e0267ba591bad92c756071  ./.gitignore
-4e0f73e7dc8ac8372ac644f196f9877d830518f21e1666746204217cb5097fdc  ./CHANGELOG.md
-f43ad47cf35ed38d6af8f5e477ceb209264d9c9ac078090ce9906b1ec6887305  ./README.md
-9684dd7423c0a14cc63baf3c8bd74b4665fc7a4c4a13d0a0ab3fe1282344b956  ./backend/.env.example
-e72b03ed5b70312f2782f2b05055c55b24670e126d50e24c4f2c559bf288f810  ./backend/.python-version
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./backend/app/__init__.py
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./backend/app/api/__init__.py
-b85ee099dd2b9743934c13333f6ad309be962491ab7a6da6e7b91c8ccba4a4b3  ./backend/app/api/health.py
-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  ./backend/app/core/__init__.py
-a4261e9fcd5a62fd0a10ae9f41935cf64dbf051ae796b9d89f8ca824893bb853  ./backend/app/core/config.py
-651a22a4b99398e5ab392619583cc9b80c4692dcf93b956854093d6ac89ae5e3  ./backend/app/core/logging.py
-a7e83fbe966ab97f0da331b3c82c7ced86b23e8089498c19e8c93e796e1f3746  ./backend/app/main.py
-b160d82f7811555051f8966d8e02750a985227c1d022208c784e606946f2eada  ./backend/pytest.ini
-63f6695a0119710f3db797ce316cacc6fd72603bbe78890c25ad8b6bbeff97a0  ./backend/requirements.txt
-819aaa0b483b1d3350bd2dcd8cb2c00e7c0f453cd38a43905b1610d9933ef984  ./backend/tests/test_health.py
-928ab5fc72c6a22833ed3248e1929d5d60017c1582b4a4d844f6c5dc8017993d  ./docs/CHANGE_PROTOCOL.md
-c4cb08459dffcacd5ea702afe98523c2c91c4424f34673d4c7235a07139e619c  ./docs/DELIVERY.md
-c3e20ba446e078971748efcc2301016f608b86cd20c2f63b94959e45c13a3111  ./docs/ROLLBACK.md
-420450e4c26ff95b842a7460b8ea7f60c8158a64b4f8242555ecfc98b6c0f307  ./docs/TEST_CHECKLIST.md
-1e58d0b82c1e51035db0d10ed923370e1c48b105a15db8e5dea9f70feb9af7ff  ./docs/VERSION_HANDOFF.md
-eaa8503379c11ade6ef8d7b77ef64e8d9772ce183cc7704ebc42a58b2f358693  ./frontend/.env.example
-177d20030d4dcc37eae9ef92865ec54dadce60e8f19e9a34a5d4f37502195a36  ./frontend/.node-version
-350cf0f4f75d51ea9e77aa8e2689247ec8a8c74199db6022b0f3bbe5a04942c8  ./frontend/.npmrc
-484691306fd698ff7731ee215b2c5864b36889cc1125637cfd87c33f5fa7bd87  ./frontend/index.html
-8e9616f6fabba24d6e8349525dbd6b0d935f427457612ac9bf62ee191a5ef8b7  ./frontend/package.json
-c20e1aae24b455d16be7f3ac5a1490c76ec0650ceeb74fa555cfcdaa1425c6b6  ./frontend/src/App.tsx
-1b049263055144c9b72739e31f9913cf240a01f5758366c486f41df9952345a1  ./frontend/src/components/Icon.tsx
-e92348b5e05f9e6ec37a7c28251e6adae8860ef9e9c8f2575242a669fc99e243  ./frontend/src/components/PageShell.tsx
-7e51d673a2daa1a14c49e0821e23ebb52e32a9e2f699bc9ef1b5bc107ad2e1df  ./frontend/src/components/Sidebar.tsx
-2f9ba7f9df6465ab79d65fdad718d833747b8e262ff1f89c31101df0665dabcb  ./frontend/src/components/StatusBadge.tsx
-7fbc3357931846dce0c7aeb09e251ed6f81a4a0d4978e90cd47c9f0305acd0a2  ./frontend/src/lib/api.test.ts
-8052ee60a4b3de2a158e6bda4682888eed22c14720010b883ee9d6075a361978  ./frontend/src/lib/api.ts
-77aaa85d0a532963cd63d1c6171a833f73b608dd83b4085f855b279dbe922939  ./frontend/src/main.tsx
-97a053bb861e61acc0c27a2f978ce193e2d92a76b0b7b6138441876b314db36b  ./frontend/src/pages/FindLeadsPage.tsx
-ea97a97142a97098a7d2a6452871578dfc03b4d3f0d5987d136f4483fba38048  ./frontend/src/pages/PlaceholderPage.tsx
-62dd89ae851364e0f88f861f1548ac30b0c43a988d42cbaea081d6677ffe16c0  ./frontend/src/styles.css
-4f577f88c6846ea7a8f50a2e0a14e7c8219bb10d1049e9f3ad7cadcbfcf66359  ./frontend/tsconfig.app.json
-770b4140bbb581e2dfd9ea9946ffc9c75a1d86ba7d2db5f77c83e37cbdf9d808  ./frontend/tsconfig.json
-cdcdbc6a52692af1b14bbc0c0738f8b50e85ed2e5f2212b8a08580ca675a4399  ./frontend/tsconfig.node.json
-a47c4d9f696cc3ab6a71df4d6867a1d7f34e1cc4b29e503a1d02014041307a6c  ./frontend/vite.config.ts
-fc87ff23f123b905ae932038ed1c78b86f42cfa03cf844cec755fb249377830e  ./render.yaml
+LEAD PLATFORM RELEASE MANIFEST
+==============================
+VERSION: 0.2.0
+CHECKPOINT: 2 — Firebase Authentication
+
+PURPOSE
+-------
+Add a complete but deliberately simple authentication layer to the stable v0.1.1 application foundation.
+
+USER-FACING FEATURES
+--------------------
+- Login
+- Registration
+- Google sign-in
+- Forgot-password email
+- Logout
+- Persistent Firebase session
+- Protected application shell
+- Account identity in header
+
+SERVER SECURITY
+---------------
+- Frontend Firebase authentication is not trusted by itself.
+- Firebase ID tokens are sent as Bearer tokens to FastAPI.
+- FastAPI verifies tokens with Firebase Admin.
+- Protected identity endpoint: GET /api/v1/auth/me
+- Missing/invalid tokens are rejected.
+- Missing server credentials prevent protected app access.
+
+DEPENDENCY CHANGES
+------------------
+FRONTEND ADD:
+- firebase==12.19.0
+
+BACKEND ADD:
+- firebase-admin==7.5.0
+
+NO DATABASE
+-----------
+Turso is intentionally not included yet.
+
+NO LEAD SEARCH
+--------------
+Lead discovery remains intentionally disabled.
+
+SECRETS
+-------
+Do not commit:
+- backend/.env
+- frontend/.env
+- Firebase Admin JSON
+- service-account private keys
+
+TEST BEFORE ACCEPTANCE
+----------------------
+frontend:
+- npm run check
+- npm run test
+- npm run build
+
+backend:
+- pytest -q
+
+manual:
+- register
+- login
+- Google login
+- password reset
+- refresh session
+- logout
+- backend-verification failure test
+
+ROLLBACK
+--------
+v0.1.1 Git tag.

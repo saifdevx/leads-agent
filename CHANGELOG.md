@@ -1,45 +1,43 @@
 # Changelog
 
-## 0.1.1 — Windows frontend install hotfix
-
-### Fixed
-- Hardened Windows installs against npm optional-dependency omission for Rolldown.
-- Explicitly pins `rolldown` 1.2.8 for Vite 8.3.x compatibility.
-- Adds the Windows x64 Rolldown native binding as an optional dependency.
-- Adds `.npmrc` with optional dependencies explicitly enabled.
-- Render frontend install now explicitly includes optional dependencies.
-
-### Preserved
-- No application UI code changed.
-- No backend code changed.
-- No API contract changed.
-- No database/authentication changes.
-
-## 0.1.0 — Checkpoint 1 Foundation
+## 0.2.0 — Checkpoint 2: Firebase Authentication
 
 ### Added
-- React/Vite/TypeScript application shell
-- Tailwind CSS v4 design integration
-- Locked brand tokens and typography
-- Simplified 4-item user navigation
-- Responsive desktop/mobile layout
-- Find Leads interaction shell
-- My Leads, Outreach and Settings prepared states
-- FastAPI application foundation
-- Structured health endpoint
-- Request ID middleware
-- Structured error response baseline
-- JSON logging baseline
-- Frontend API health status
-- Backend health tests
-- Frontend API-client tests
-- Render deployment blueprint
-- Environment templates
-- Setup, testing and rollback documentation
 
-### Not yet added
-- Authentication
-- Database
-- Lead search/enrichment
-- AI
-- Email sending
+- Firebase email/password registration and sign-in
+- Google sign-in
+- Password reset email
+- Firebase auth session handling
+- Protected frontend application shell
+- Firebase setup-required screen
+- Backend verification-error screen with retry/sign-out
+- Firebase Admin server integration
+- Protected `GET /api/v1/auth/me`
+- Authentication tests and user-friendly error mapping
+- `docs/FIREBASE_SETUP.md`
+
+### Changed
+
+- Application version updated to 0.2.0
+- Header now displays authenticated account identity and sign-out control
+- HTTP exceptions preserve authentication headers
+- Render config includes Firebase build/runtime variables
+- `.gitignore` protects common service-account JSON filenames
+- Find Leads copy now reflects Checkpoint 2
+
+### Preserved
+
+- v0.1.1 Windows Rolldown fix
+- Existing visual design system
+- Simplified Find Leads / My Leads / Outreach / Settings navigation
+- Health API and request IDs
+- No lead-search functionality yet
+
+## 0.1.1 — Checkpoint 1 hotfix
+
+- Hardened Windows Rolldown optional dependency installation.
+- Corrected version-aware health test behavior.
+
+## 0.1.0 — Checkpoint 1 foundation
+
+- Initial React/Vite frontend and FastAPI backend foundation.

@@ -1,58 +1,73 @@
-# Delivery Notes — v0.1.1
-
-## VERSION
-`0.1.1`
+# Delivery — v0.2.0
 
 ## PURPOSE
-Fix the Windows frontend install failure caused when npm omits Rolldown's platform-specific native optional dependency.
 
-## REPLACE
-Use this ZIP as the full Checkpoint 1 replacement.
+Add secure Firebase Authentication without changing the simplified lead-generation product flow.
 
-## KEEP
-- Your existing local backend `.env`
-- Any local frontend `.env` values
-- All Checkpoint 0 product decisions
+## ADD NEW
 
-## CHANGED
-- `frontend/package.json`
-- `frontend/.npmrc` (new)
-- `README.md`
-- `CHANGELOG.md`
-- `render.yaml`
-- version documentation
+```text
+backend/app/auth/__init__.py
+backend/app/auth/schemas.py
+backend/app/auth/firebase.py
+backend/app/auth/dependencies.py
+backend/app/api/auth.py
+backend/tests/test_auth.py
 
-## UNCHANGED
-- React application source
-- FastAPI source
-- API contract
-- UI design
+frontend/src/auth/AuthContext.tsx
+frontend/src/auth/errors.ts
+frontend/src/auth/errors.test.ts
+frontend/src/lib/firebase.ts
+frontend/src/pages/AuthPage.tsx
+frontend/src/pages/AuthSetupPage.tsx
+frontend/src/pages/AuthLoadingPage.tsx
+frontend/src/pages/AuthVerificationErrorPage.tsx
 
-## INSTALL — WINDOWS HOTFIX
-
-```powershell
-cd frontend
-Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
-Remove-Item -Force package-lock.json -ErrorAction SilentlyContinue
-npm cache verify
-npm install --include=optional
-npm run dev
+docs/FIREBASE_SETUP.md
 ```
 
-## TEST
+## REPLACE / UPDATE
 
-```powershell
-npm run check
-npm run test
-npm run build
+```text
+.gitignore
+README.md
+CHANGELOG.md
+RELEASE_MANIFEST.txt
+render.yaml
+
+backend/.env.example
+backend/requirements.txt
+backend/app/main.py
+backend/app/core/config.py
+
+frontend/.env.example
+frontend/package.json
+frontend/src/main.tsx
+frontend/src/App.tsx
+frontend/src/lib/api.ts
+frontend/src/lib/api.test.ts
+frontend/src/components/PageShell.tsx
+frontend/src/components/Sidebar.tsx
+frontend/src/components/Icon.tsx
+frontend/src/pages/FindLeadsPage.tsx
+
+docs/DELIVERY.md
+docs/ROLLBACK.md
+docs/TEST_CHECKLIST.md
+docs/VERSION_HANDOFF.md
 ```
 
-Backend regression:
+## KEEP PRIVATE / DO NOT REPLACE WITH EXAMPLES
 
-```powershell
-cd ..\backend
-pytest -q
+```text
+.git/
+backend/.env
+backend/.venv/
+frontend/.env
 ```
 
-## ROLLBACK
-See `docs/ROLLBACK.md`.
+Update real `.env` values manually after copying the new `.env.example` files.
+
+## IMPORTANT
+
+Never commit Firebase Admin JSON credentials.

@@ -7,6 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
@@ -55,6 +56,7 @@ async def request_context(request: Request, call_next):
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
+        headers=exc.headers,
         content={
             "error": {
                 "code": "http_error",
@@ -99,3 +101,4 @@ async def unexpected_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(health_router)
+app.include_router(auth_router)
