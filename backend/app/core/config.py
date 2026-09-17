@@ -5,13 +5,16 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Lead Platform API"
-    app_version: str = "0.2.0"
+    app_version: str = "0.3.0"
     app_env: str = "development"
     cors_origins: str = "http://localhost:5173"
     log_level: str = "INFO"
     firebase_project_id: str = ""
     firebase_credentials_path: str = ""
     firebase_service_account_json: str = ""
+    turso_database_url: str = ""
+    turso_auth_token: str = ""
+    turso_timeout_seconds: float = 10.0
 
     model_config = SettingsConfigDict(
         env_file=".env",

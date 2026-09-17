@@ -1,73 +1,67 @@
-# Delivery — v0.2.0
+# Delivery — v0.3.0
 
 ## PURPOSE
 
-Add secure Firebase Authentication without changing the simplified lead-generation product flow.
+Add Turso persistence without expanding the user-facing product or starting lead discovery early.
 
 ## ADD NEW
 
 ```text
-backend/app/auth/__init__.py
-backend/app/auth/schemas.py
-backend/app/auth/firebase.py
-backend/app/auth/dependencies.py
-backend/app/api/auth.py
-backend/tests/test_auth.py
-
-frontend/src/auth/AuthContext.tsx
-frontend/src/auth/errors.ts
-frontend/src/auth/errors.test.ts
-frontend/src/lib/firebase.ts
-frontend/src/pages/AuthPage.tsx
-frontend/src/pages/AuthSetupPage.tsx
-frontend/src/pages/AuthLoadingPage.tsx
-frontend/src/pages/AuthVerificationErrorPage.tsx
-
-docs/FIREBASE_SETUP.md
+backend/app/db/__init__.py
+backend/app/db/client.py
+backend/app/db/dependencies.py
+backend/app/db/user_repository.py
+backend/app/db/migrate.py
+backend/migrations/001_initial.sql
+backend/tests/test_db_client.py
+backend/tests/test_user_repository.py
+backend/tests/test_migrations.py
+docs/TURSO_SETUP.md
 ```
 
 ## REPLACE / UPDATE
 
 ```text
-.gitignore
 README.md
 CHANGELOG.md
 RELEASE_MANIFEST.txt
 render.yaml
 
 backend/.env.example
-backend/requirements.txt
 backend/app/main.py
 backend/app/core/config.py
+backend/app/auth/dependencies.py
+backend/app/api/auth.py
+backend/tests/test_auth.py
 
-frontend/.env.example
 frontend/package.json
-frontend/src/main.tsx
-frontend/src/App.tsx
-frontend/src/lib/api.ts
-frontend/src/lib/api.test.ts
-frontend/src/components/PageShell.tsx
 frontend/src/components/Sidebar.tsx
-frontend/src/components/Icon.tsx
 frontend/src/pages/FindLeadsPage.tsx
+frontend/src/App.tsx
+frontend/src/lib/api.test.ts
+frontend/src/pages/AuthSetupPage.tsx
 
+docs/FIREBASE_SETUP.md
 docs/DELIVERY.md
 docs/ROLLBACK.md
 docs/TEST_CHECKLIST.md
 docs/VERSION_HANDOFF.md
 ```
 
-## KEEP PRIVATE / DO NOT REPLACE WITH EXAMPLES
+## KEEP PRIVATE / LOCAL
 
 ```text
 .git/
 backend/.env
 backend/.venv/
 frontend/.env
+frontend/package-lock.json
+frontend/node_modules/
+D:/Leads-Agent/secrets/firebase-admin.json
 ```
 
-Update real `.env` values manually after copying the new `.env.example` files.
+Update the real `backend/.env` manually with the Turso values.
 
-## IMPORTANT
+## NO NEW PACKAGE DEPENDENCY
 
-Never commit Firebase Admin JSON credentials.
+Checkpoint 3 deliberately reuses `httpx` for Turso SQL over HTTP. This avoids adding a native database driver to the local Windows environment.

@@ -1,75 +1,48 @@
 LEAD PLATFORM RELEASE MANIFEST
 ==============================
-VERSION: 0.2.0
-CHECKPOINT: 2 — Firebase Authentication
+VERSION: 0.3.0
+CHECKPOINT: 3 — Turso Database Foundation
+BASELINE: v0.2.0
 
-PURPOSE
--------
-Add a complete but deliberately simple authentication layer to the stable v0.1.1 application foundation.
+ADDED
+-----
+backend/app/db/client.py
+backend/app/db/dependencies.py
+backend/app/db/user_repository.py
+backend/app/db/migrate.py
+backend/migrations/001_initial.sql
+backend/tests/test_db_client.py
+backend/tests/test_user_repository.py
+backend/tests/test_migrations.py
+docs/TURSO_SETUP.md
 
-USER-FACING FEATURES
---------------------
-- Login
-- Registration
-- Google sign-in
-- Forgot-password email
-- Logout
-- Persistent Firebase session
-- Protected application shell
-- Account identity in header
+CORE BEHAVIOR
+-------------
+Firebase continues to authenticate users.
+FastAPI verifies the Firebase ID token.
+After verification, the user is inserted/updated in Turso.
+The frontend auth response shape is unchanged.
 
-SERVER SECURITY
+DATABASE TABLES
 ---------------
-- Frontend Firebase authentication is not trusted by itself.
-- Firebase ID tokens are sent as Bearer tokens to FastAPI.
-- FastAPI verifies tokens with Firebase Admin.
-- Protected identity endpoint: GET /api/v1/auth/me
-- Missing/invalid tokens are rejected.
-- Missing server credentials prevent protected app access.
-
-DEPENDENCY CHANGES
-------------------
-FRONTEND ADD:
-- firebase==12.19.0
-
-BACKEND ADD:
-- firebase-admin==7.5.0
-
-NO DATABASE
------------
-Turso is intentionally not included yet.
-
-NO LEAD SEARCH
---------------
-Lead discovery remains intentionally disabled.
+schema_migrations
+users
+lead_lists
+leads
+provider_connections
+jobs
 
 SECRETS
 -------
-Do not commit:
-- backend/.env
-- frontend/.env
-- Firebase Admin JSON
-- service-account private keys
+TURSO_DATABASE_URL and TURSO_AUTH_TOKEN are backend-only.
+No real .env files or secrets are included.
 
-TEST BEFORE ACCEPTANCE
-----------------------
-frontend:
-- npm run check
-- npm run test
-- npm run build
-
-backend:
-- pytest -q
-
-manual:
-- register
-- login
-- Google login
-- password reset
-- refresh session
-- logout
-- backend-verification failure test
-
-ROLLBACK
---------
-v0.1.1 Git tag.
+NOT INCLUDED YET
+----------------
+Lead search
+Provider API integrations
+Crawler
+AI providers
+Email sending
+Campaigns
+Admin dashboard

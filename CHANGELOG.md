@@ -1,37 +1,37 @@
 # Changelog
 
-## 0.2.0 — Checkpoint 2: Firebase Authentication
+## 0.3.0 — Checkpoint 3: Turso Database Foundation
 
 ### Added
 
-- Firebase email/password registration and sign-in
-- Google sign-in
-- Password reset email
-- Firebase auth session handling
-- Protected frontend application shell
-- Firebase setup-required screen
-- Backend verification-error screen with retry/sign-out
-- Firebase Admin server integration
-- Protected `GET /api/v1/auth/me`
-- Authentication tests and user-friendly error mapping
-- `docs/FIREBASE_SETUP.md`
+- Turso SQL-over-HTTP database client
+- Safe Turso value encoding/decoding and error classification
+- Versioned migration runner (`python -m app.db.migrate`)
+- Initial migration with `users`, `lead_lists`, `leads`, `provider_connections`, and `jobs`
+- Automatic Firebase-user upsert into Turso during `/api/v1/auth/me`
+- Turso runtime environment variables and Render placeholders
+- Database client, migration, repository, and auth-sync tests
+- `docs/TURSO_SETUP.md`
 
 ### Changed
 
-- Application version updated to 0.2.0
-- Header now displays authenticated account identity and sign-out control
-- HTTP exceptions preserve authentication headers
-- Render config includes Firebase build/runtime variables
-- `.gitignore` protects common service-account JSON filenames
-- Find Leads copy now reflects Checkpoint 2
+- Application version updated to 0.3.0
+- Auth verification now also persists the application user record
+- Database errors are returned using safe public error messages
+- Product shell copy reflects the database checkpoint
 
 ### Preserved
 
+- Firebase email/password and Google authentication
+- Password reset and logout/session behavior
 - v0.1.1 Windows Rolldown fix
+- Simplified four-item navigation
 - Existing visual design system
-- Simplified Find Leads / My Leads / Outreach / Settings navigation
-- Health API and request IDs
-- No lead-search functionality yet
+- No lead-search or email-sending functionality yet
+
+## 0.2.0 — Checkpoint 2: Firebase Authentication
+
+- Added Firebase Authentication and server-side token verification.
 
 ## 0.1.1 — Checkpoint 1 hotfix
 

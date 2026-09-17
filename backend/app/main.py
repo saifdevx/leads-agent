@@ -11,6 +11,11 @@ from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.db.client import (
+    DatabaseConfigurationError,
+    DatabaseQueryError,
+    DatabaseUnavailableError,
+)
 
 settings = get_settings()
 configure_logging(settings.log_level)
@@ -77,6 +82,61 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
                 "message": "The request contains invalid data.",
                 "request_id": getattr(request.state, "request_id", None),
                 "details": exc.errors(),
+            }
+        },
+    )
+
+
+@app.exception_handler(DatabaseConfigurationError)
+async def database_configuration_handler(request: Request, exc: DatabaseConfigurationError):
+    logger.error(
+        "Database configuration error",
+        extra={"request_id": getattr(request.state, "request_id", None)},
+    )
+    return JSONResponse(
+        status_code=503,
+        content={
+            "error": {
+                "code": "database_not_configured",
+                "message": "The application database is not configured correctly.",
+                "request_id": getattr(request.state, "request_id", None),
+            }
+        },
+    )
+
+
+@app.exception_handler(DatabaseUnavailableError)
+async def database_unavailable_handler(request: Request, exc: DatabaseUnavailableError):
+    logger.warning(
+        "Database temporarily unavailable",
+        extra={"request_id": getattr(request.state, "request_id", None)},
+    )
+    return JSONResponse(
+        status_code=503,
+        content={
+            "error": {
+                "code": "database_unavailable",
+                "message": "The application database is temporarily unavailable.",
+                "request_id": getattr(request.state, "request_id", None),
+            }
+        },
+    )
+
+
+@app.exception_handler(DatabaseQueryError)
+async def database_query_handler(request: Request, exc: DatabaseQueryError):
+    logger.error(
+        "Database operation failed (code=%s)",
+        exc.code or "unknown",
+        extra={"request_id": getattr(request.state, "request_id", None)},
+    )
+    return JSONResponse(
+        status_code=500,
+        content={
+            "error": {
+                "code": "database_error",
+                "message": "The application database operation failed.",
+                "request_id": getattr(request.state, "request_id", None),
             }
         },
     )

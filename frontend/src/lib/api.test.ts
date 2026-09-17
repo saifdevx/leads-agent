@@ -10,7 +10,7 @@ describe('getHealth', () => {
     const payload = {
       status: 'ok' as const,
       service: 'lead-platform-api',
-      version: '0.2.0',
+      version: '0.3.0',
       environment: 'test',
       timestamp: '2026-09-16T00:00:00Z',
       request_id: 'test-request',

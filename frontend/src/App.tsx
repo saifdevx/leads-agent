@@ -76,7 +76,7 @@ function Workspace({ user, identity, onSignOut }: { user: User; identity: Authen
 
       {notice && (
         <div role="status" className="fixed bottom-5 right-5 z-[80] max-w-[420px] rounded-[12px] border border-[#DCD9EB] bg-white px-4 py-3.5 text-sm font-medium leading-5 text-[#333640] shadow-[0_16px_45px_rgba(20,21,28,0.15)]">
-          <div className="mb-1 text-xs font-bold uppercase tracking-[0.09em] text-[#7B61FF]">Checkpoint 2</div>
+          <div className="mb-1 text-xs font-bold uppercase tracking-[0.09em] text-[#7B61FF]">Checkpoint 3</div>
           {notice}
         </div>
       )}

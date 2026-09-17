@@ -37,7 +37,7 @@ services:
       - key: APP_ENV
         value: production
       - key: APP_VERSION
-        value: 0.2.0
+        value: 0.3.0
       - key: CORS_ORIGINS
         sync: false
       - key: LOG_LEVEL
@@ -46,3 +46,9 @@ services:
         sync: false
       - key: FIREBASE_SERVICE_ACCOUNT_JSON
         sync: false
+      - key: TURSO_DATABASE_URL
+        sync: false
+      - key: TURSO_AUTH_TOKEN
+        sync: false
+      - key: TURSO_TIMEOUT_SECONDS
+        value: 10

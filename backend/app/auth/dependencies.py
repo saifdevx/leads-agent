@@ -8,6 +8,8 @@ from app.auth.firebase import (
     verify_firebase_token,
 )
 from app.auth.schemas import AuthenticatedUser
+from app.db.dependencies import get_user_repository
+from app.db.user_repository import UserRepository
 
 bearer_scheme = HTTPBearer(auto_error=False)
 
@@ -50,3 +52,12 @@ def get_current_user(
         email_verified=bool(decoded.get("email_verified", False)),
         sign_in_provider=firebase_claims.get("sign_in_provider"),
     )
+
+
+def get_current_application_user(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    repository: UserRepository = Depends(get_user_repository),
+) -> AuthenticatedUser:
+    """Verify Firebase identity and persist/update the application user record."""
+    repository.sync_authenticated_user(current_user)
+    return current_user

@@ -1,21 +1,19 @@
 # Version Handoff
 
 PROJECT: Lead Platform
-CURRENT VERSION: 0.2.0
-CURRENT CHECKPOINT: 2 — Firebase Authentication
+CURRENT VERSION: 0.3.0
+CURRENT CHECKPOINT: 3 — Turso Database Foundation
 
 ## WHAT WORKS
 
 - React/Vite/Tailwind application shell
-- FastAPI health/API foundation
-- Windows Rolldown installation hardening from v0.1.1
-- Firebase email/password registration and login
-- Firebase Google sign-in
-- Firebase password reset
-- Firebase logout/session restoration
-- Protected frontend shell
-- Backend Firebase Admin token verification
-- Protected `/api/v1/auth/me`
+- Firebase email/password and Google authentication
+- Password reset/logout/session restoration
+- FastAPI Firebase token verification
+- Turso SQL-over-HTTP backend connection
+- Versioned database migrations
+- Automatic application-user sync into Turso
+- Initial tables for users, lead lists, leads, provider connections, and jobs
 
 ## CURRENT STACK
 
@@ -26,35 +24,39 @@ CURRENT CHECKPOINT: 2 — Firebase Authentication
 - Firebase JS SDK 12.19.0
 - FastAPI 0.141.1
 - Firebase Admin Python 7.5.0
+- Turso Cloud SQL over HTTP through httpx 0.28.1
 
 ## DATA
 
-No application database yet. Firebase is used only for authentication in this checkpoint.
+Turso is now the application source of truth. Firebase remains authentication-only.
 
-## AUTH
+Current schema version: `001_initial`.
 
-Firebase Authentication. Frontend obtains Firebase ID token; FastAPI independently verifies it before protected application access.
+## AUTH + USER SYNC
+
+Firebase verifies identity. The backend then upserts the verified user into Turso using `firebase_uid` as the stable user identifier.
 
 ## DO NOT CHANGE WITHOUT A CHECKPOINT
 
-- Simplified 4-item user navigation
+- Simplified four-item navigation
+- Firebase as the authentication provider
+- Turso as application persistence
+- Server-side ownership/security boundary
 - Free-first product direction
-- Frontend/backend separation
-- Server-side auth verification requirement
-- Secret handling rules
+- Provider secrets never exposed to the frontend
 
 ## KNOWN LIMITATIONS
 
-- No Turso user record yet
-- No role/admin claims yet
-- No lead discovery yet
-- No email verification enforcement
-- No production deployment validation yet
+- Lead lists/leads tables exist but no lead CRUD/search UI uses them yet
+- Provider connections table exists but credentials are not stored yet
+- Jobs table exists but no worker runs yet
+- No campaign/email tables yet
+- No admin dashboard yet
 
 ## NEXT CHECKPOINT
 
-Checkpoint 3 — Turso database foundation with a deliberately small schema tied to Firebase UID.
+Free/manual Lead Finder foundation: create a lead list, generate/store search intent, paste/import raw results, parse basic public lead data, and persist the results to Turso. Automated providers remain a later incremental step.
 
 ## ROLLBACK
 
-Git tag `v0.1.1`.
+Git tag `v0.2.0`.

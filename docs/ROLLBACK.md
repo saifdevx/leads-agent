@@ -1,40 +1,21 @@
-# Rollback — v0.2.0
+# Rollback — v0.3.0
 
-Checkpoint 1 stable release `v0.1.1` is the rollback point.
+## Trusted code rollback point
 
-## Before applying v0.2.0
+`v0.2.0` is the last accepted release before Turso.
 
-Confirm:
+Before copying v0.3.0, confirm v0.2.0 is pushed and tagged.
 
-```powershell
-git status
-git tag --list
-```
+## If v0.3.0 fails before acceptance
 
-You should already have `v0.1.1` pushed to GitHub.
+Return the source tree to tag `v0.2.0` using your normal Git workflow, or restore your saved v0.2.0 ZIP.
 
-## Roll back source code
+Do not delete Firebase users or credentials.
 
-If v0.2.0 cannot be accepted, return to the previous stable tag using your normal Git workflow. One safe approach is to create a rollback branch first:
+## Database rollback
 
-```powershell
-git switch -c rollback-v0.1.1 v0.1.1
-```
+Migration `001_initial.sql` only creates new application tables and indexes. It does not alter Firebase or existing application data because no previous application database existed.
 
-Or restore `main` to the known-good source only when you intentionally want to discard later changes.
+For a failed local setup, the simplest safe option is to leave the Turso database in place and restore the v0.2.0 code. v0.2.0 does not know about Turso and will ignore those tables.
 
-## Local dependencies after rollback
-
-Frontend `package.json` will no longer require Firebase. Clean/reinstall if necessary:
-
-```powershell
-cd frontend
-Remove-Item -Recurse -Force node_modules -ErrorAction SilentlyContinue
-npm install --include=optional
-```
-
-Backend `requirements.txt` will no longer require Firebase Admin. Recreating `.venv` is the cleanest rollback if dependency state matters.
-
-## Secrets
-
-The Firebase project and service-account key do not need to be deleted merely because source code is rolled back. Keep them private. If a credential was accidentally committed or exposed, revoke/rotate it in Google/Firebase immediately.
+Do not manually drop tables once real lead data exists in later checkpoints without a dedicated migration/backup plan.

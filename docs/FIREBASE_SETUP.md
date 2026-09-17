@@ -74,7 +74,7 @@ Update `backend/.env`:
 
 ```env
 APP_NAME=Lead Platform API
-APP_VERSION=0.2.0
+APP_VERSION=0.3.0
 APP_ENV=development
 CORS_ORIGINS=http://localhost:5173
 LOG_LEVEL=INFO
