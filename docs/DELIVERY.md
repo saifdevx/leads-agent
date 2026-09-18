@@ -1,54 +1,10 @@
-# Delivery — v0.3.0
+# Delivery Notes — Free Lead Finder
 
-## PURPOSE
+## Replace
 
-Add Turso persistence without expanding the user-facing product or starting lead discovery early.
+Copy the complete release source over the existing repository.
 
-## ADD NEW
-
-```text
-backend/app/db/__init__.py
-backend/app/db/client.py
-backend/app/db/dependencies.py
-backend/app/db/user_repository.py
-backend/app/db/migrate.py
-backend/migrations/001_initial.sql
-backend/tests/test_db_client.py
-backend/tests/test_user_repository.py
-backend/tests/test_migrations.py
-docs/TURSO_SETUP.md
-```
-
-## REPLACE / UPDATE
-
-```text
-README.md
-CHANGELOG.md
-RELEASE_MANIFEST.txt
-render.yaml
-
-backend/.env.example
-backend/app/main.py
-backend/app/core/config.py
-backend/app/auth/dependencies.py
-backend/app/api/auth.py
-backend/tests/test_auth.py
-
-frontend/package.json
-frontend/src/components/Sidebar.tsx
-frontend/src/pages/FindLeadsPage.tsx
-frontend/src/App.tsx
-frontend/src/lib/api.test.ts
-frontend/src/pages/AuthSetupPage.tsx
-
-docs/FIREBASE_SETUP.md
-docs/DELIVERY.md
-docs/ROLLBACK.md
-docs/TEST_CHECKLIST.md
-docs/VERSION_HANDOFF.md
-```
-
-## KEEP PRIVATE / LOCAL
+## Keep locally
 
 ```text
 .git/
@@ -57,11 +13,40 @@ backend/.venv/
 frontend/.env
 frontend/package-lock.json
 frontend/node_modules/
-D:/Leads-Agent/secrets/firebase-admin.json
 ```
 
-Update the real `backend/.env` manually with the Turso values.
+## New backend files
 
-## NO NEW PACKAGE DEPENDENCY
+```text
+backend/app/api/leads.py
+backend/app/leads/__init__.py
+backend/app/leads/parser.py
+backend/app/leads/repository.py
+backend/app/leads/schemas.py
+backend/app/leads/search_queries.py
+backend/tests/test_lead_parser.py
+backend/tests/test_lead_repository.py
+backend/tests/test_leads_api.py
+```
 
-Checkpoint 3 deliberately reuses `httpx` for Turso SQL over HTTP. This avoids adding a native database driver to the local Windows environment.
+## New frontend file
+
+```text
+frontend/src/pages/MyLeadsPage.tsx
+```
+
+## Important modified files
+
+```text
+backend/app/main.py
+backend/app/db/dependencies.py
+backend/app/core/config.py
+frontend/src/App.tsx
+frontend/src/lib/api.ts
+frontend/src/lib/api.test.ts
+frontend/src/pages/FindLeadsPage.tsx
+frontend/src/components/Icon.tsx
+frontend/src/components/Sidebar.tsx
+```
+
+No new package or database migration is required.

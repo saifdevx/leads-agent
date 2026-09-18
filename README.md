@@ -1,27 +1,27 @@
-# Lead Platform v0.3.0
+# Lead Platform
 
-Checkpoint 3 adds the persistent Turso database foundation on top of the stable Firebase-authenticated v0.2.0 release.
+A free-first lead generation web app built with React/Vite, FastAPI, Firebase Authentication and Turso.
 
-## What works in this release
+## Current capabilities
 
-- Everything from v0.2.0 remains intact
-- Turso Cloud connection through SQL over HTTP
-- Versioned database migrations
-- Minimal initial schema: users, lead lists, leads, provider connections, jobs
-- Firebase users automatically synced into Turso after server-side token verification
-- Database configuration/unavailable/query errors return safe API responses
-- Database unit tests use mocked HTTP and do not require a paid/live database
-- Lead search remains intentionally disabled
+- Firebase email/password and Google authentication
+- Server-side Firebase token verification
+- Turso persistence
+- Simple navigation: Find Leads, My Leads, Outreach, Settings
+- Free lead-search plan generation
+- Google-style query generation for websites and social profiles
+- Manual paste/import of visible search-result text
+- Contact extraction for public business emails, phone numbers, websites and social URLs
+- In-list deduplication before saving
+- Lead lists and a searchable My Leads table
 
-## Why SQL over HTTP
+Paid search, AI enrichment and email outreach are intentionally not enabled yet.
 
-The backend talks to Turso over its documented HTTP protocol using the existing `httpx` dependency. This avoids a native libSQL extension and keeps local Windows/Python 3.14 setup predictable.
+## Updating an existing local project
 
-## Updating from v0.2.0
+Copy this package over the existing repository and allow source files to be replaced.
 
-Your v0.2.0 should already be committed and tagged. Copy the complete v0.3.0 source over the existing repository and allow source files to be replaced.
-
-Keep these private/local items:
+Keep these local/private items:
 
 ```text
 .git/
@@ -32,11 +32,21 @@ frontend/package-lock.json
 frontend/node_modules/
 ```
 
-Do not replace or commit the real `.env` files.
+Do not replace or commit real `.env` files.
 
-## 1. Frontend
+## Local environment update
 
-There are no new frontend packages in this checkpoint. After copying:
+Your existing Turso/Firebase settings stay the same. Only update the backend application version if you keep it in your real `.env`:
+
+```env
+APP_VERSION=0.4.0
+```
+
+No new Firebase, Turso or frontend environment variables are required.
+
+## Frontend
+
+No new npm dependency is required.
 
 ```powershell
 cd D:\Leads-Agent\leads-agent\frontend
@@ -44,102 +54,49 @@ npm install --include=optional
 npm run check
 npm run test
 npm run build
+npm run dev
 ```
 
-## 2. Backend
+## Backend
 
-There are no new Python package dependencies in this checkpoint.
+No new Python dependency is required.
 
 ```powershell
 cd D:\Leads-Agent\leads-agent\backend
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pytest -q
-```
-
-## 3. Configure Turso
-
-Follow `docs/TURSO_SETUP.md`.
-
-Your existing `backend/.env` keeps its Firebase values and adds:
-
-```env
-APP_VERSION=0.3.0
-TURSO_DATABASE_URL=turso://...
-TURSO_AUTH_TOKEN=...
-TURSO_TIMEOUT_SECONDS=10
-```
-
-## 4. Run the migration
-
-```powershell
-cd D:\Leads-Agent\leads-agent\backend
-.venv\Scripts\Activate.ps1
-python -m app.db.migrate
-```
-
-First run should apply `001_initial`; the second run should report that the schema is already up to date.
-
-## 5. Run locally
-
-Backend:
-
-```powershell
 uvicorn app.main:app --reload --port 8000
 ```
 
-Frontend in another terminal:
+No new database migration is required for the free lead finder because the existing `lead_lists` and `leads` schema already supports it. Running the migration command is still safe:
 
 ```powershell
-cd D:\Leads-Agent\leads-agent\frontend
-npm run dev
+python -m app.db.migrate
 ```
 
-Open `http://localhost:5173` and sign in.
+It should report that the database schema is already up to date.
 
-## 6. What happens on sign-in now
+## Free lead workflow
 
-```text
-Firebase login
-    ↓
-Frontend gets Firebase ID token
-    ↓
-FastAPI verifies token
-    ↓
-FastAPI upserts the user into Turso
-    ↓
-Protected app opens
-```
+1. Sign in.
+2. Open **Find Leads**.
+3. Enter niche, location and target lead count.
+4. Click **Create free search plan**.
+5. Open one of the generated Google searches.
+6. Copy visible result text from relevant results/pages.
+7. Paste the text into Lead Platform.
+8. Click **Extract & save leads**.
+9. Open **My Leads** to review saved contacts.
 
-The frontend auth response has not changed, so this is an additive backend capability rather than a UI rewrite.
+The parser is best-effort. It extracts public data that is present in the pasted text; it does not fabricate missing contact details.
 
-## 7. Acceptance tests
+## Important limitation
 
-Use `docs/TEST_CHECKLIST.md` before accepting the checkpoint.
+This release does not automatically scrape Google, Instagram, LinkedIn or Facebook. It generates useful queries and processes text the user chooses to paste. Automated search-provider integrations come later through supported APIs/adapters.
 
-Expected automated suites after copying/configuring:
+## Source control
 
-```text
-Frontend: 6 tests
-Backend: 12 tests
-```
+After local tests and a real import test pass, commit normally using your preferred professional commit message. No Git tag or public checkpoint naming is required.
 
-The exact warning count may vary with installed dependency versions; warnings are not failures.
-
-## 8. Git after acceptance
-
-Only after all tests and live Turso sync pass:
-
-```powershell
-cd D:\Leads-Agent\leads-agent
-git status
-git add .
-git commit -m "feat: add Turso database foundation v0.3.0"
-git push origin main
-git tag -a v0.3.0 -m "Checkpoint 3 Turso database foundation"
-git push origin v0.3.0
-```
-
-## Rollback
-
-See `docs/ROLLBACK.md`. Git tag `v0.2.0` remains the trusted code rollback point. The initial Turso migration is additive and does not modify Firebase.
+See `docs/TEST_CHECKLIST.md` for acceptance tests and `docs/ROLLBACK.md` for rollback guidance.

@@ -3,6 +3,7 @@ from functools import lru_cache
 from app.core.config import get_settings
 from app.db.client import DatabaseConfigurationError, TursoHttpClient
 from app.db.user_repository import UserRepository
+from app.leads.repository import LeadRepository
 
 
 @lru_cache
@@ -20,3 +21,7 @@ def get_database_client() -> TursoHttpClient:
 
 def get_user_repository() -> UserRepository:
     return UserRepository(get_database_client())
+
+
+def get_lead_repository() -> LeadRepository:
+    return LeadRepository(get_database_client())

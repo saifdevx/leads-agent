@@ -1,21 +1,14 @@
-# Rollback — v0.3.0
+# Rollback
 
-## Trusted code rollback point
+This change is additive at the application level and does not add a database migration.
 
-`v0.2.0` is the last accepted release before Turso.
+If the free lead finder causes an issue:
 
-Before copying v0.3.0, confirm v0.2.0 is pushed and tagged.
+1. Use Git to restore the last stable commit.
+2. Keep the existing Firebase and Turso credentials unchanged.
+3. Restart backend and frontend.
+4. Run backend/frontend regression tests again.
 
-## If v0.3.0 fails before acceptance
+Leads imported before a code rollback remain in Turso because this release uses the existing `lead_lists` and `leads` tables. A code rollback does not delete user data.
 
-Return the source tree to tag `v0.2.0` using your normal Git workflow, or restore your saved v0.2.0 ZIP.
-
-Do not delete Firebase users or credentials.
-
-## Database rollback
-
-Migration `001_initial.sql` only creates new application tables and indexes. It does not alter Firebase or existing application data because no previous application database existed.
-
-For a failed local setup, the simplest safe option is to leave the Turso database in place and restore the v0.2.0 code. v0.2.0 does not know about Turso and will ignore those tables.
-
-Do not manually drop tables once real lead data exists in later checkpoints without a dedicated migration/backup plan.
+Do not delete Turso tables as part of a normal rollback.

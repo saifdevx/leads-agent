@@ -1,43 +1,25 @@
 # Changelog
 
-## 0.3.0 — Checkpoint 3: Turso Database Foundation
+## Free lead finder
 
 ### Added
-
-- Turso SQL-over-HTTP database client
-- Safe Turso value encoding/decoding and error classification
-- Versioned migration runner (`python -m app.db.migrate`)
-- Initial migration with `users`, `lead_lists`, `leads`, `provider_connections`, and `jobs`
-- Automatic Firebase-user upsert into Turso during `/api/v1/auth/me`
-- Turso runtime environment variables and Render placeholders
-- Database client, migration, repository, and auth-sync tests
-- `docs/TURSO_SETUP.md`
+- Free search-plan generator based on niche and optional location.
+- Search queries for general web, Gmail mentions, Instagram, Facebook and LinkedIn company pages.
+- Manual paste/import workflow for visible search-result text.
+- Public email, phone, website and social-link extraction.
+- Best-effort company-name inference.
+- Duplicate prevention before inserting leads into Turso.
+- Lead-list API and authenticated lead API.
+- Functional **My Leads** table with list filtering and client-side search.
+- Clear extraction summary showing extracted, added, duplicate and skipped records.
 
 ### Changed
-
-- Application version updated to 0.3.0
-- Auth verification now also persists the application user record
-- Database errors are returned using safe public error messages
-- Product shell copy reflects the database checkpoint
+- Removed development-version copy from the sidebar.
+- Find Leads is now functional instead of a placeholder.
+- My Leads is now functional instead of a placeholder.
 
 ### Preserved
-
-- Firebase email/password and Google authentication
-- Password reset and logout/session behavior
-- v0.1.1 Windows Rolldown fix
-- Simplified four-item navigation
-- Existing visual design system
-- No lead-search or email-sending functionality yet
-
-## 0.2.0 — Checkpoint 2: Firebase Authentication
-
-- Added Firebase Authentication and server-side token verification.
-
-## 0.1.1 — Checkpoint 1 hotfix
-
-- Hardened Windows Rolldown optional dependency installation.
-- Corrected version-aware health test behavior.
-
-## 0.1.0 — Checkpoint 1 foundation
-
-- Initial React/Vite frontend and FastAPI backend foundation.
+- Firebase authentication behavior.
+- Turso user synchronization.
+- Existing database schema.
+- Outreach and Settings placeholders.

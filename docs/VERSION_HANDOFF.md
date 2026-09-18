@@ -1,62 +1,49 @@
-# Version Handoff
+# Handoff
 
-PROJECT: Lead Platform
-CURRENT VERSION: 0.3.0
-CURRENT CHECKPOINT: 3 — Turso Database Foundation
+## Working features
 
-## WHAT WORKS
+- React/Vite application shell
+- FastAPI API
+- Firebase authentication and server verification
+- Turso persistence and migrations
+- User sync from Firebase to Turso
+- Free lead search-plan generation
+- Manual search-result import
+- Public contact extraction and dedupe
+- Lead-list persistence
+- My Leads table
 
-- React/Vite/Tailwind application shell
-- Firebase email/password and Google authentication
-- Password reset/logout/session restoration
-- FastAPI Firebase token verification
-- Turso SQL-over-HTTP backend connection
-- Versioned database migrations
-- Automatic application-user sync into Turso
-- Initial tables for users, lead lists, leads, provider connections, and jobs
+## Current providers
 
-## CURRENT STACK
+No external search/enrichment provider is required for the free flow.
 
-- React 19.3
-- Vite 8.3
-- TypeScript 6.0
-- Tailwind CSS 4.3
-- Firebase JS SDK 12.19.0
-- FastAPI 0.141.1
-- Firebase Admin Python 7.5.0
-- Turso Cloud SQL over HTTP through httpx 0.28.1
+## Private local configuration
 
-## DATA
+Environment variable names only:
 
-Turso is now the application source of truth. Firebase remains authentication-only.
+```text
+VITE_API_URL
+VITE_FIREBASE_API_KEY
+VITE_FIREBASE_AUTH_DOMAIN
+VITE_FIREBASE_PROJECT_ID
+VITE_FIREBASE_APP_ID
+VITE_FIREBASE_MESSAGING_SENDER_ID
+VITE_FIREBASE_STORAGE_BUCKET
+APP_NAME
+APP_VERSION
+APP_ENV
+CORS_ORIGINS
+LOG_LEVEL
+FIREBASE_PROJECT_ID
+FIREBASE_CREDENTIALS_PATH
+FIREBASE_SERVICE_ACCOUNT_JSON
+TURSO_DATABASE_URL
+TURSO_AUTH_TOKEN
+TURSO_TIMEOUT_SECONDS
+```
 
-Current schema version: `001_initial`.
+Never store the values in handoff documents or Git.
 
-## AUTH + USER SYNC
+## Next logical feature
 
-Firebase verifies identity. The backend then upserts the verified user into Turso using `firebase_uid` as the stable user identifier.
-
-## DO NOT CHANGE WITHOUT A CHECKPOINT
-
-- Simplified four-item navigation
-- Firebase as the authentication provider
-- Turso as application persistence
-- Server-side ownership/security boundary
-- Free-first product direction
-- Provider secrets never exposed to the frontend
-
-## KNOWN LIMITATIONS
-
-- Lead lists/leads tables exist but no lead CRUD/search UI uses them yet
-- Provider connections table exists but credentials are not stored yet
-- Jobs table exists but no worker runs yet
-- No campaign/email tables yet
-- No admin dashboard yet
-
-## NEXT CHECKPOINT
-
-Free/manual Lead Finder foundation: create a lead list, generate/store search intent, paste/import raw results, parse basic public lead data, and persist the results to Turso. Automated providers remain a later incremental step.
-
-## ROLLBACK
-
-Git tag `v0.2.0`.
+Automated free/search-provider integration (for example Brave/Serper adapters) and website crawling, only after the manual free workflow is validated with real lead searches.

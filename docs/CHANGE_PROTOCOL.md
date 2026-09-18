@@ -1,6 +1,6 @@
 # Change Protocol
 
-Every future checkpoint or hotfix must follow this sequence:
+Every future feature or hotfix must follow this sequence:
 
 1. Inspect the currently working files.
 2. Identify behavior that must remain working.
@@ -14,4 +14,4 @@ Every future checkpoint or hotfix must follow this sequence:
 10. Package a full replacement ZIP.
 11. Document ADD / REPLACE / KEEP / BACKUP / TEST / ROLLBACK.
 
-No future checkpoint should casually rewrite unrelated working modules.
+Do not casually rewrite unrelated working modules.

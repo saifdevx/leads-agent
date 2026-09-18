@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import type { User } from 'firebase/auth'
 import { useAuth } from './auth/AuthContext'
 import { PageShell } from './components/PageShell'
@@ -9,6 +9,7 @@ import { AuthPage } from './pages/AuthPage'
 import { AuthSetupPage } from './pages/AuthSetupPage'
 import { AuthVerificationErrorPage } from './pages/AuthVerificationErrorPage'
 import { FindLeadsPage } from './pages/FindLeadsPage'
+import { MyLeadsPage } from './pages/MyLeadsPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
 
 type PageKey = 'find' | 'leads' | 'outreach' | 'settings'
@@ -25,7 +26,7 @@ function Workspace({ user, identity, onSignOut }: { user: User; identity: Authen
   const [page, setPage] = useState<PageKey>('find')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [health, setHealth] = useState<HealthState>('loading')
-  const [notice, setNotice] = useState<string | null>(null)
+  const getToken = useCallback(() => user.getIdToken(), [user])
 
   useEffect(() => {
     const controller = new AbortController()
@@ -42,17 +43,11 @@ function Workspace({ user, identity, onSignOut }: { user: User; identity: Authen
     }
   }, [])
 
-  useEffect(() => {
-    if (!notice) return
-    const timer = window.setTimeout(() => setNotice(null), 4500)
-    return () => window.clearTimeout(timer)
-  }, [notice])
-
   let content
   if (page === 'find') {
-    content = <FindLeadsPage onFoundationAction={setNotice} />
+    content = <FindLeadsPage getToken={getToken} onViewLeads={() => setPage('leads')} />
   } else if (page === 'leads') {
-    content = <PlaceholderPage title="My Leads" description="One clean table will hold the leads you discover. We will keep company and contact details together in the first version instead of exposing CRM-style complexity." icon="users" checkpoint="Lead Management" bullets={['Search and filter', 'Email and phone status', 'Lead score', 'Excel export']} />
+    content = <MyLeadsPage getToken={getToken} />
   } else if (page === 'outreach') {
     content = <PlaceholderPage title="Outreach" description="Outreach will stay intentionally simple: choose leads, select a template and sender, preview the batch, then approve the campaign." icon="mail" checkpoint="Outreach" bullets={['User templates', 'Gmail sender', 'Daily limits', 'Pause and resume']} />
   } else {
@@ -73,13 +68,6 @@ function Workspace({ user, identity, onSignOut }: { user: User; identity: Authen
       >
         {content}
       </PageShell>
-
-      {notice && (
-        <div role="status" className="fixed bottom-5 right-5 z-[80] max-w-[420px] rounded-[12px] border border-[#DCD9EB] bg-white px-4 py-3.5 text-sm font-medium leading-5 text-[#333640] shadow-[0_16px_45px_rgba(20,21,28,0.15)]">
-          <div className="mb-1 text-xs font-bold uppercase tracking-[0.09em] text-[#7B61FF]">Checkpoint 3</div>
-          {notice}
-        </div>
-      )}
     </div>
   )
 }
@@ -106,7 +94,7 @@ function VerifiedWorkspace({ user, onSignOut }: { user: User; onSignOut: () => P
         if (nextError instanceof ApiRequestError) {
           setError(nextError.message)
         } else {
-          setError('The backend could not verify your Firebase session. Check that the API and Firebase Admin credentials are configured.')
+          setError('The backend could not verify your Firebase session. Check that the API, Firebase Admin credentials and Turso database are configured.')
         }
       })
 

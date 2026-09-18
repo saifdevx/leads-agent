@@ -1,96 +1,78 @@
-# Test Checklist — v0.3.0
+# Test Checklist
 
-Do not move to the lead-discovery checkpoint until this list passes.
+Run this checklist before pushing the updated code.
 
-## A. Preserve v0.2.0
+## Automated checks
 
-- [ ] Git tag `v0.2.0` exists remotely.
-- [ ] `backend/.env`, `frontend/.env`, Firebase Admin JSON, `.venv`, and `node_modules` are not tracked.
+Backend:
 
-## B. Automated frontend checks
+```powershell
+cd D:\Leads-Agent\leads-agent\backend
+.venv\Scripts\Activate.ps1
+pytest -q
+python -m app.db.migrate
+```
+
+Frontend:
 
 ```powershell
 cd D:\Leads-Agent\leads-agent\frontend
-npm install --include=optional
 npm run check
 npm run test
 npm run build
 ```
 
-- [ ] TypeScript check passes.
-- [ ] 6 frontend tests pass.
-- [ ] Production build succeeds.
+## Authentication regression
 
-## C. Automated backend checks
+- Register/login still works.
+- Google sign-in still works.
+- Sign out still works.
+- Refresh preserves the Firebase session.
+- Protected `/api/v1/auth/me` still rejects unauthenticated requests.
 
-```powershell
-cd D:\Leads-Agent\leads-agent\backend
-.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-pytest -q
+## Free lead finder
+
+Use this test input:
+
+```text
+Sun Peak Solar
+https://sunpeaksolar.com/contact
+Email: hello@sunpeaksolar.com
+Phone: +1 (214) 555-0198
+https://www.instagram.com/sunpeaksolar/
+
+Green Volt Energy
+https://greenvolt.example
+sales@greenvolt.example
+https://www.linkedin.com/company/green-volt/
 ```
 
-- [ ] 12 backend tests pass.
-- [ ] Existing Firebase tests still pass.
-- [ ] Turso HTTP client tests pass.
-- [ ] Migration test passes.
-- [ ] User repository sync test passes.
+Expected:
 
-## D. Turso configuration
+- Create a search plan successfully.
+- Eight search queries are shown.
+- Copy query button works.
+- Google button opens a new search tab.
+- Paste the sample text and import it.
+- Two contacts are extracted and saved on a clean list.
+- Re-importing the same sample adds zero new leads and reports duplicates.
+- My Leads shows the saved businesses.
+- List filter works.
+- Search field filters the table.
+- Website/social buttons only show when a URL exists.
 
-- [ ] Turso Database created.
-- [ ] `TURSO_DATABASE_URL` added only to backend `.env`.
-- [ ] `TURSO_AUTH_TOKEN` added only to backend `.env`.
-- [ ] Token is not visible in Git status/diff.
+## Data isolation
 
-## E. Migration
+If you have a second Firebase test account:
 
-```powershell
-python -m app.db.migrate
-```
+- Sign in as Account A and save a lead.
+- Sign out and sign in as Account B.
+- Account B must not see Account A's lead list or leads.
 
-- [ ] First run applies `001_initial`.
-- [ ] Second run reports schema is already up to date.
-- [ ] Turso shows `schema_migrations`, `users`, `lead_lists`, `leads`, `provider_connections`, and `jobs`.
+## UI
 
-## F. Runtime
-
-```powershell
-uvicorn app.main:app --reload --port 8000
-```
-
-- [ ] `/health` returns HTTP 200 and version `0.3.0`.
-- [ ] `/docs` loads.
-- [ ] Logged-out `/api/v1/auth/me` returns 401.
-
-## G. Live user sync
-
-- [ ] Start frontend and sign in with an existing Firebase user.
-- [ ] Protected app opens normally.
-- [ ] Turso `users` table contains that Firebase UID.
-- [ ] Email/display name/provider match the Firebase identity.
-- [ ] Sign out and sign in again.
-- [ ] The same row is updated; a duplicate user row is not created.
-
-## H. Failure behavior
-
-Temporarily use an invalid Turso token, restart backend, and try authenticated verification.
-
-- [ ] Protected app does not pretend verification succeeded.
-- [ ] Backend returns a safe database configuration error.
-- [ ] Raw token and SQL are not returned to the browser.
-
-Restore the correct token afterwards.
-
-## I. Regression
-
-- [ ] Email/password login still works.
-- [ ] Google login still works.
-- [ ] Logout still works.
-- [ ] Password reset still works.
-- [ ] Sidebar remains Find Leads / My Leads / Outreach / Settings.
-- [ ] Find Leads remains intentionally non-functional.
-
-## Acceptance
-
-Checkpoint 3 is accepted only after automated tests and live Turso user sync pass.
+- Desktop sidebar works.
+- Mobile navigation works.
+- Find Leads remains usable on mobile.
+- My Leads table can scroll horizontally on smaller screens.
+- No visible checkpoint/version development text appears in the product UI.

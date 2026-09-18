@@ -24,7 +24,7 @@ export function Sidebar({ active, onNavigate, mobileOpen, onMobileClose }: Props
           <div className="grid h-9 w-9 place-items-center rounded-[10px] bg-[#7B61FF] font-display text-sm font-extrabold tracking-tight">LP</div>
           <div>
             <div className="font-display text-[15px] font-bold tracking-[-0.01em]">Lead Platform</div>
-            <div className="mt-0.5 text-[11px] text-white/45">v0.3.0 database</div>
+            <div className="mt-0.5 text-[11px] text-white/45">Free-first prospecting</div>
           </div>
         </button>
         <button onClick={onMobileClose} className="focus-ring rounded-lg p-2 text-white/70 hover:bg-white/10 lg:hidden" aria-label="Close navigation">

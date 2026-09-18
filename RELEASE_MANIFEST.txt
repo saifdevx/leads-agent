@@ -1,48 +1,26 @@
-LEAD PLATFORM RELEASE MANIFEST
-==============================
-VERSION: 0.3.0
-CHECKPOINT: 3 — Turso Database Foundation
-BASELINE: v0.2.0
+LEAD PLATFORM — FREE LEAD FINDER RELEASE
 
-ADDED
------
-backend/app/db/client.py
-backend/app/db/dependencies.py
-backend/app/db/user_repository.py
-backend/app/db/migrate.py
-backend/migrations/001_initial.sql
-backend/tests/test_db_client.py
-backend/tests/test_user_repository.py
-backend/tests/test_migrations.py
-docs/TURSO_SETUP.md
+Purpose:
+- Generate free Google-style search queries.
+- Import visible search-result text.
+- Extract and deduplicate public lead/contact details.
+- Save leads to Turso and review them in My Leads.
 
-CORE BEHAVIOR
--------------
-Firebase continues to authenticate users.
-FastAPI verifies the Firebase ID token.
-After verification, the user is inserted/updated in Turso.
-The frontend auth response shape is unchanged.
+No new npm package.
+No new Python package.
+No new database migration.
 
-DATABASE TABLES
----------------
-schema_migrations
-users
-lead_lists
-leads
-provider_connections
-jobs
+Preserve locally:
+- .git/
+- backend/.env
+- backend/.venv/
+- frontend/.env
+- frontend/package-lock.json
+- frontend/node_modules/
 
-SECRETS
--------
-TURSO_DATABASE_URL and TURSO_AUTH_TOKEN are backend-only.
-No real .env files or secrets are included.
-
-NOT INCLUDED YET
-----------------
-Lead search
-Provider API integrations
-Crawler
-AI providers
-Email sending
-Campaigns
-Admin dashboard
+Acceptance:
+- Backend tests pass.
+- Frontend typecheck/tests/build pass.
+- Authentication regression passes.
+- Duplicate import test passes.
+- Cross-user data isolation passes where possible.
