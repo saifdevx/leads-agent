@@ -308,3 +308,91 @@ export async function downloadLeadExport(
     filename: match?.[1] || `leads.${input.format}`,
   }
 }
+
+export type EmailTemplate = {
+  id: string
+  name: string
+  category: string
+  subject: string
+  body: string
+  is_active: boolean
+  created_at: string
+  updated_at: string
+}
+
+export type SenderConnection = {
+  id: string
+  provider: string
+  email: string
+  display_name: string | null
+  status: string
+  last_error: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type Campaign = {
+  id: string
+  name: string
+  status: string
+  template_id: string
+  sender_id: string
+  sender_email: string | null
+  daily_limit: number
+  send_start_hour: number
+  send_end_hour: number
+  timezone: string
+  min_interval_seconds: number
+  recipient_count: number
+  sent_count: number
+  failed_count: number
+  skipped_count: number
+  approved_at: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type CampaignPreviewItem = { lead_id: string; to_email: string; subject: string; body: string }
+export type CampaignCreateResult = {
+  campaign: Campaign
+  preview: CampaignPreviewItem[]
+  suppressed_count: number
+  missing_email_count: number
+}
+
+export async function getTemplates(idToken: string): Promise<EmailTemplate[]> {
+  return authRequest<EmailTemplate[]>('/api/v1/outreach/templates', idToken)
+}
+export async function saveTemplate(idToken: string, input: { name: string; category: string; subject: string; body: string }, templateId?: string): Promise<EmailTemplate> {
+  return authRequest<EmailTemplate>(templateId ? `/api/v1/outreach/templates/${encodeURIComponent(templateId)}` : '/api/v1/outreach/templates', idToken, {
+    method: templateId ? 'PUT' : 'POST', body: JSON.stringify(input),
+  })
+}
+export async function deleteTemplate(idToken: string, templateId: string): Promise<void> {
+  await authRequest(`/api/v1/outreach/templates/${encodeURIComponent(templateId)}`, idToken, { method: 'DELETE' })
+}
+export async function getSenders(idToken: string): Promise<SenderConnection[]> {
+  return authRequest<SenderConnection[]>('/api/v1/outreach/senders', idToken)
+}
+export async function getGmailAuthorizeUrl(idToken: string): Promise<string> {
+  const result = await authRequest<{ authorization_url: string }>('/api/v1/outreach/gmail/authorize-url', idToken)
+  return result.authorization_url
+}
+export async function disconnectSender(idToken: string, senderId: string): Promise<void> {
+  await authRequest(`/api/v1/outreach/senders/${encodeURIComponent(senderId)}`, idToken, { method: 'DELETE' })
+}
+export async function getCampaigns(idToken: string): Promise<Campaign[]> {
+  return authRequest<Campaign[]>('/api/v1/outreach/campaigns', idToken)
+}
+export async function createCampaign(idToken: string, input: {
+  name: string; lead_ids: string[]; template_id: string; sender_id: string; daily_limit: number;
+  send_start_hour: number; send_end_hour: number; timezone: string; min_interval_seconds: number;
+}): Promise<CampaignCreateResult> {
+  return authRequest<CampaignCreateResult>('/api/v1/outreach/campaigns', idToken, { method: 'POST', body: JSON.stringify(input) })
+}
+export async function campaignAction(idToken: string, campaignId: string, action: 'approve'|'pause'|'resume'|'cancel'): Promise<Campaign> {
+  return authRequest<Campaign>(`/api/v1/outreach/campaigns/${encodeURIComponent(campaignId)}/${action}`, idToken, { method: 'POST' })
+}
+export async function suppressEmail(idToken: string, email: string, reason = 'manual'): Promise<void> {
+  await authRequest('/api/v1/outreach/suppression', idToken, { method: 'POST', body: JSON.stringify({ email, reason }) })
+}

@@ -10,7 +10,7 @@ import { AuthSetupPage } from './pages/AuthSetupPage'
 import { AuthVerificationErrorPage } from './pages/AuthVerificationErrorPage'
 import { FindLeadsPage } from './pages/FindLeadsPage'
 import { MyLeadsPage } from './pages/MyLeadsPage'
-import { PlaceholderPage } from './pages/PlaceholderPage'
+import { OutreachPage } from './pages/OutreachPage'
 import { SettingsPage } from './pages/SettingsPage'
 
 type PageKey = 'find' | 'leads' | 'outreach' | 'settings'
@@ -24,9 +24,10 @@ const pageMeta: Record<PageKey, { title: string; eyebrow?: string }> = {
 }
 
 function Workspace({ user, identity, onSignOut }: { user: User; identity: AuthenticatedUserResponse; onSignOut: () => Promise<void> }) {
-  const [page, setPage] = useState<PageKey>('find')
+  const [page, setPage] = useState<PageKey>(() => new URLSearchParams(window.location.search).has('gmail') ? 'outreach' : 'find')
   const [mobileOpen, setMobileOpen] = useState(false)
   const [health, setHealth] = useState<HealthState>('loading')
+  const [outreachLeadIds, setOutreachLeadIds] = useState<string[]>([])
   const getToken = useCallback(() => user.getIdToken(), [user])
 
   useEffect(() => {
@@ -48,9 +49,9 @@ function Workspace({ user, identity, onSignOut }: { user: User; identity: Authen
   if (page === 'find') {
     content = <FindLeadsPage getToken={getToken} onViewLeads={() => setPage('leads')} onOpenSettings={() => setPage('settings')} />
   } else if (page === 'leads') {
-    content = <MyLeadsPage getToken={getToken} />
+    content = <MyLeadsPage getToken={getToken} onStartOutreach={(ids) => { setOutreachLeadIds(ids); setPage('outreach') }} />
   } else if (page === 'outreach') {
-    content = <PlaceholderPage title="Outreach" description="Outreach will stay intentionally simple: choose leads, select a template and sender, preview the batch, then approve the campaign." icon="mail" checkpoint="Outreach" bullets={['User templates', 'Gmail sender', 'Daily limits', 'Pause and resume']} />
+    content = <OutreachPage getToken={getToken} initialLeadIds={outreachLeadIds} onClearInitialLeadIds={() => setOutreachLeadIds([])} onOpenLeads={() => setPage('leads')} />
   } else {
     content = <SettingsPage getToken={getToken} />
   }

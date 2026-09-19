@@ -1,22 +1,37 @@
-LEAD PLATFORM — ENRICHMENT + BETTER EXPORTS
+LEAD PLATFORM — COMBINED OUTREACH MVP
 
-Adds:
-- Prospeo BYOK integration
-- Apollo BYOK integration
-- Bulk selected-lead enrichment
-- Decision-maker targeting
-- Verified-email enrichment
-- Excel export
-- CSV export
-- Filtered/selected export behavior
-- My Leads selection + quality filters + stats
+This bundle deliberately combines several previously planned mini-steps:
+- User email templates
+- Gmail OAuth sender connection
+- Encrypted OAuth token storage
+- Lead selection → Outreach handoff
+- Campaign draft creation
+- Message preview
+- Explicit approval gate
+- Persistent email queue
+- Separate worker process
+- Gmail API sending
+- Daily sending limits
+- Sending windows/timezone
+- Minimum interval
+- Pause/resume/cancel
+- Suppression filtering
+- Duplicate protection within a campaign
+- Basic campaign metrics
 
-New backend dependency:
-- XlsxWriter==3.2.9
+New migration:
+- backend/migrations/002_outreach.sql
 
-No new frontend dependency.
-No database migration required.
-No new environment variable required.
+New environment variables:
+- FRONTEND_APP_URL
+- GMAIL_OAUTH_CLIENT_ID
+- GMAIL_OAUTH_CLIENT_SECRET
+- GMAIL_OAUTH_REDIRECT_URI
+
+No new Python package dependency is required for Gmail; OAuth and Gmail REST calls use existing httpx.
+
+Local sending requires a third process:
+- python -m app.outreach.worker
 
 Preserve locally:
 - .git/
@@ -26,17 +41,7 @@ Preserve locally:
 - frontend/package-lock.json
 - frontend/node_modules/
 
-Do not regenerate:
+Never change or lose:
 - CREDENTIAL_ENCRYPTION_KEY
 
-Acceptance:
-- Existing frontend regression checks pass.
-- Existing backend regression tests pass locally.
-- Prospeo key validates and stores encrypted.
-- Apollo key validates and stores encrypted.
-- Enrichment updates selected lead records without creating duplicates.
-- Already-verified leads are skipped.
-- Excel export opens and contains Leads + Summary sheets.
-- CSV export contains the same lead fields.
-- Selected export exports selected IDs only.
-- Filtered export respects search/email/score filters.
+First send test must use one recipient email you control.

@@ -1,16 +1,25 @@
 # Changelog
 
-## Enrichment + export update
+## Combined Outreach MVP
 
-- Added Prospeo BYOK provider and key validation.
-- Added Apollo BYOK provider and key validation.
-- Added background bulk lead enrichment for up to 100 selected leads.
-- Added smart Prospeo → Apollo fallback.
-- Added decision-maker targeting by role.
-- Added verified-email and contact-data merge into existing lead records.
-- Added skip behavior for already verified leads.
-- Added Excel and CSV exports.
-- Added formatted Excel workbook with Summary + Leads sheets.
-- Added My Leads selection, score/email filters, quick stats, bulk enrichment and export controls.
-- Added XlsxWriter backend dependency.
-- No database migration required.
+Added a larger feature bundle to accelerate the project:
+
+- Email template CRUD with personalization variables
+- Gmail OAuth sender connection (server-side authorization)
+- Encrypted Gmail OAuth token storage
+- Select leads in My Leads and hand them directly to Outreach
+- Draft campaign creation and message preview
+- Explicit human approval gate before any external send
+- Persistent email queue stored in Turso
+- Separate background email worker
+- Gmail API `messages.send` integration
+- Daily sender limits
+- Sending-hour windows and timezone handling
+- Minimum send interval
+- Pause, resume, and cancel controls
+- Suppression table/filtering
+- Duplicate-send protection inside campaigns
+- Basic outreach metrics and campaign history
+- New additive database migration `002_outreach`
+
+Not included yet: reply synchronization, automatic stop-on-reply, multi-step follow-ups, advanced admin controls, and production deliverability analytics. These are planned as a later combined polish bundle after the core sending path is validated.

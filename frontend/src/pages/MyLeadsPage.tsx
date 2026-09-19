@@ -11,7 +11,7 @@ import {
   type LeadList,
 } from '../lib/api'
 
-type Props = { getToken: () => Promise<string> }
+type Props = { getToken: () => Promise<string>; onStartOutreach?: (leadIds: string[]) => void }
 type EmailFilter = 'all' | 'verified' | 'has_email' | 'missing_email'
 type ExportFormat = 'xlsx' | 'csv'
 type EnrichmentProvider = 'auto' | 'prospeo' | 'apollo'
@@ -29,7 +29,7 @@ function downloadBlob(blob: Blob, filename: string) {
   URL.revokeObjectURL(url)
 }
 
-export function MyLeadsPage({ getToken }: Props) {
+export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
   const [lists, setLists] = useState<LeadList[]>([])
   const [leads, setLeads] = useState<Lead[]>([])
   const [selectedList, setSelectedList] = useState('all')
@@ -217,6 +217,14 @@ export function MyLeadsPage({ getToken }: Props) {
               <p className="mt-1 text-sm text-[#777A87]">Filter, enrich, select and export your best prospects without leaving this screen.</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                disabled={!selectedCount}
+                onClick={() => onStartOutreach?.([...selectedIds])}
+                className="focus-ring inline-flex h-10 items-center gap-2 rounded-[9px] border border-[#D9D4F7] bg-[#F7F5FF] px-3.5 text-sm font-bold text-[#6B54D7] hover:bg-[#F0EDFF] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <Icon name="mail" className="h-4 w-4" /> Outreach{selectedCount ? ` ${selectedCount}` : ''}
+              </button>
               <button
                 type="button"
                 disabled={!selectedCount || selectedCount > 100 || enriching}

@@ -37,7 +37,7 @@ services:
       - key: APP_ENV
         value: production
       - key: APP_VERSION
-        value: 0.5.0
+        value: 0.7.0
       - key: CORS_ORIGINS
         sync: false
       - key: LOG_LEVEL
@@ -51,6 +51,19 @@ services:
       - key: TURSO_AUTH_TOKEN
         sync: false
       - key: TURSO_TIMEOUT_SECONDS
-        value: 10
+        value: 15
       - key: CREDENTIAL_ENCRYPTION_KEY
         sync: false
+      - key: FRONTEND_APP_URL
+        sync: false
+      - key: GMAIL_OAUTH_CLIENT_ID
+        sync: false
+      - key: GMAIL_OAUTH_CLIENT_SECRET
+        sync: false
+      - key: GMAIL_OAUTH_REDIRECT_URI
+        sync: false
+
+# Production email sending requires an always-on worker process.
+# Add a Render Background Worker using backend as rootDir and:
+#   startCommand: python -m app.outreach.worker
+# Configure the same backend secrets plus the Gmail OAuth variables below.

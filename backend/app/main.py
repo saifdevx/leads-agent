@@ -12,6 +12,7 @@ from app.api.health import router as health_router
 from app.api.leads import router as leads_router
 from app.api.jobs import router as jobs_router
 from app.api.providers import router as providers_router
+from app.api.outreach import router as outreach_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.providers.security import CredentialEncryptionError
@@ -187,3 +188,4 @@ app.include_router(auth_router)
 app.include_router(leads_router)
 app.include_router(providers_router)
 app.include_router(jobs_router)
+app.include_router(outreach_router)

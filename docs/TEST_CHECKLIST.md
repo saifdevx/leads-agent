@@ -2,54 +2,67 @@
 
 ## Regression
 
-### Frontend
+Frontend:
 ```powershell
+npm install --include=optional
 npm run check
 npm run test
 npm run build
 ```
 
-### Backend
+Backend:
 ```powershell
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
 pytest -q
 python -m app.db.migrate
 ```
 
-Migration should report that the schema is already up to date.
+Migration should apply `002_outreach` once, then report up to date on the second run.
 
-## Provider settings
+## Existing lead engine
+- [ ] Firebase login/logout still works.
+- [ ] Find Leads automated discovery still works.
+- [ ] Serper/Brave settings still load.
+- [ ] Gemini/OpenAI settings still load.
+- [ ] Prospeo/Apollo enrichment still works.
+- [ ] Excel/CSV export still works.
 
-- [ ] Existing Serper connection still loads.
-- [ ] Existing Gemini/OpenAI connection still loads.
-- [ ] Prospeo appears in Settings.
-- [ ] Apollo appears in Settings.
-- [ ] Invalid Prospeo key is rejected.
-- [ ] Valid Prospeo key is accepted.
-- [ ] Invalid Apollo key is rejected.
-- [ ] Valid Apollo key is accepted.
-- [ ] Saved provider key is masked after refresh.
+## Templates
+- [ ] Create template.
+- [ ] Edit template.
+- [ ] Delete template.
+- [ ] Variables render in preview.
+- [ ] Unknown variables do not leak literally into emails.
 
-## Lead enrichment
+## Gmail connection
+- [ ] Gmail API enabled in Google Cloud.
+- [ ] OAuth client uses exact local redirect URI.
+- [ ] Connect Gmail opens Google consent.
+- [ ] Successful callback returns to Outreach > Senders.
+- [ ] Sender email appears connected.
+- [ ] Gmail tokens never appear in frontend or logs.
+- [ ] Disconnect removes sender.
 
-- [ ] Select 5–10 leads.
-- [ ] Enrich button enables.
-- [ ] Smart provider mode starts a background job.
-- [ ] Job polling survives temporary database 503 responses.
-- [ ] Already-verified lead is not charged/enriched again.
-- [ ] Missing contact can receive name/title/email/LinkedIn when provider finds a match.
-- [ ] Verified email status displays as Verified.
-- [ ] Existing business row is updated; no duplicate lead row is created.
-- [ ] Enrichment source is appended to existing source.
-- [ ] More than 100 selected leads cannot be enriched in one run.
+## Campaign safety
+- [ ] Select one test lead from My Leads and click Outreach.
+- [ ] Draft creation does not send anything.
+- [ ] Preview shows correct recipient/subject/body.
+- [ ] Suppressed addresses are skipped.
+- [ ] Missing email addresses are skipped.
+- [ ] Campaign sends only after explicit approval.
+- [ ] Pause stops worker from taking new queued messages.
+- [ ] Resume continues.
+- [ ] Cancel prevents remaining draft/queued messages.
+- [ ] Same lead cannot be inserted twice into one campaign.
 
-## Export
-
-- [ ] Export current filtered view to XLSX.
-- [ ] Workbook contains `Leads` and `Summary` sheets.
-- [ ] XLSX hyperlinks open correctly.
-- [ ] Verified email status is visibly highlighted.
-- [ ] Export current filtered view to CSV.
-- [ ] Select several rows and export selected only.
-- [ ] Email-status filter is reflected in filtered export.
-- [ ] Minimum-score filter is reflected in filtered export.
-- [ ] Empty export produces a clear error instead of a blank file.
+## Worker
+- [ ] Without worker, approved messages remain queued safely.
+- [ ] `python -m app.outreach.worker` starts cleanly.
+- [ ] First test uses an email address you control.
+- [ ] Daily limit is respected.
+- [ ] Sending window is respected.
+- [ ] Minimum interval is respected.
+- [ ] Successful Gmail send increments sent count.
+- [ ] Failed send is marked failed and not silently retried.
+- [ ] Completed campaign moves to completed when no active messages remain.
