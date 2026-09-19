@@ -1,19 +1,22 @@
-LEAD PLATFORM — AUTOMATED DISCOVERY UPDATE
+LEAD PLATFORM — DISCOVERY QUALITY & RELIABILITY UPDATE
 
 Purpose:
-- Make Find Leads fully automatic through supported search APIs.
-- Add secure BYOK integrations for Serper, Brave, Gemini and OpenAI.
-- Crawl public company websites for missing contact details.
-- Improve extraction quality and deduplicate before saving.
-
-New Python dependency:
-- cryptography==50.0.1
+- Improve automated lead accuracy before adding paid enrichment providers.
+- Fix false phone/company fields and duplicate businesses.
+- Make temporary Turso failures recover automatically.
+- Harden AI provider security and fallback behavior.
 
 No new frontend dependency.
+No new Python dependency.
 No database migration required.
+No new environment variable required.
 
-New required backend environment variable:
-- CREDENTIAL_ENCRYPTION_KEY
+Recommended local environment adjustment:
+- TURSO_TIMEOUT_SECONDS=15
+
+Critical security action before reusing Gemini:
+- Rotate the Gemini key that appeared in previous local logs.
+- Replace the old Gemini key through Settings after installing this update.
 
 Preserve locally:
 - .git/
@@ -24,10 +27,11 @@ Preserve locally:
 - frontend/node_modules/
 
 Acceptance:
-- Existing authentication regression passes.
-- Existing database regression passes.
-- Provider keys can connect and disconnect without being returned in plaintext.
-- Automated search completes using Serper or Brave.
-- Results save to Turso and appear in My Leads.
-- Manual fallback remains functional.
-- Frontend typecheck/tests/build pass.
+- Existing regression tests pass locally.
+- Gemini key never appears in request URLs/logs.
+- Temporary job-status 503 does not stop frontend polling.
+- Facebook IDs/dates are not parsed as phone numbers.
+- Explicit Florida results are rejected for a Texas search.
+- Template/demo hosts do not count as leads.
+- Same business/domain merges instead of creating duplicate rows.
+- Serper automated search still completes and saves leads.

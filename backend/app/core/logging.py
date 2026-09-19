@@ -27,3 +27,8 @@ def configure_logging(level: str = "INFO") -> None:
 
     for handler in root.handlers:
         handler.setFormatter(JsonFormatter())
+
+    # Third-party HTTP client INFO logs can include full provider URLs. Keep them quiet so
+    # API keys placed in query strings by external libraries can never leak into our logs.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)

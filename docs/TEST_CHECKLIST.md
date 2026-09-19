@@ -1,82 +1,48 @@
-# Test Checklist
+# Test Checklist — Discovery Quality & Reliability
 
-## Existing regression
+## Before testing
+- [ ] Previous working build is pushed to Git.
+- [ ] Real `.env` files were preserved.
+- [ ] `CREDENTIAL_ENCRYPTION_KEY` was NOT regenerated.
+- [ ] Previously exposed Gemini key was revoked/rotated.
+- [ ] `TURSO_TIMEOUT_SECONDS=15` is recommended locally.
 
-Frontend:
+## Frontend
+- [ ] `npm install --include=optional`
+- [ ] `npm run check`
+- [ ] `npm run test`
+- [ ] `npm run build`
+- [ ] `npm run dev`
 
-```powershell
-npm run check
-npm run test
-npm run build
-```
+## Backend
+- [ ] `pip install -r requirements.txt`
+- [ ] `pytest -q`
+- [ ] `python -m app.db.migrate` reports already up to date
+- [ ] backend starts on port 8000
 
-Backend:
+## Providers
+- [ ] Serper remains connected.
+- [ ] New Gemini key can be connected.
+- [ ] Invalid Gemini generation access is rejected during connection.
+- [ ] Provider API keys do not appear in backend request logs.
 
-```powershell
-pytest -q
-python -m app.db.migrate
-```
+## Automated quality benchmark
+Search: Pressure washing / Texas, USA / 25 leads.
 
-Expected backend regression in this package: **24 tests passed** (dependency deprecation warnings may still appear).
+- [ ] search starts automatically
+- [ ] temporary Turso/job-polling failures retry rather than stop the UI
+- [ ] no obvious Facebook IDs as phone numbers
+- [ ] no date-like phone values
+- [ ] explicit out-of-state result such as Central Florida is rejected
+- [ ] template/demo sites are rejected
+- [ ] duplicate company domains merge into one record
+- [ ] company names are better than generic page titles where website metadata exists
+- [ ] website crawler failures do not stop the run
+- [ ] job completes or reaches bounded search budget cleanly
 
-The migration should report that the database is already up to date.
-
-## BYOK security
-
-- Settings loads without exposing any plaintext stored key.
-- Connect Serper or Brave with a valid key.
-- The UI shows only a masked key hint after saving.
-- Refresh the browser; provider remains connected.
-- Disconnect the provider; it shows disconnected.
-- Reconnect it successfully.
-- Confirm `backend/.env`, provider API keys and the Firebase Admin credential are not visible in Git status.
-
-## Automated discovery
-
-Start small:
-
-```text
-Niche: Solar panel installers
-Location: Texas, USA
-Leads: 25
-```
-
-- Click Find Leads.
-- Search starts without opening Google manually.
-- Smart mode uses Serper when connected; Brave is the fallback/default alternative when Serper is unavailable.
-- Progress updates automatically.
-- Job reaches `complete` or returns a clear provider error.
-- At least some useful leads appear in My Leads when the provider returns relevant results.
-- Search stops at/before the configured search-call budget.
-- Duplicate records are not repeatedly inserted into the same list.
-
-## AI extraction
-
-Test once without AI and once with Gemini/OpenAI connected.
-
-- Without AI: deterministic extraction still produces results.
-- With AI: obvious directories/articles/jobs should be filtered more aggressively.
-- AI-returned email, phone and URL fields are post-validated against search evidence; unsupported values are discarded.
-- AI must not fabricate email addresses that are absent from search/website evidence.
-
-## Website crawler
-
-Use several discovered company websites.
-
-- Public contact emails/phones/social links may be added.
-- Private/local network URLs are rejected by crawler safety checks.
-- Crawler failure for one website does not stop the whole search.
-
-## Manual fallback
-
-- Switch to Manual fallback.
-- Generate queries.
-- Paste sample search text.
-- Extract & save still works.
-
-## My Leads
-
-- Lead-list filter works.
-- Text search works.
-- Website/social links open correctly.
-- Sources show Serper/Brave/AI/manual as appropriate.
+## Regression
+- [ ] Login/logout still work.
+- [ ] My Leads still loads.
+- [ ] Manual fallback still works.
+- [ ] Export still works.
+- [ ] Settings connect/disconnect still work.

@@ -148,7 +148,7 @@ export function SettingsPage({ getToken }: Props) {
               </label>
             )}
 
-            <div className="mt-6 rounded-[10px] bg-[#F8F7FC] px-4 py-3 text-xs leading-5 text-[#6E717D]">The backend validates this key before saving it. The plaintext key is not returned after storage.</div>
+            <div className="mt-6 rounded-[10px] bg-[#F8F7FC] px-4 py-3 text-xs leading-5 text-[#6E717D]">The backend validates this key before saving it. AI connections run one tiny generation test so unusable project/model access is caught immediately. The plaintext key is not returned after storage.</div>
 
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" disabled={saving} onClick={() => setDraft(null)} className="focus-ring h-10 rounded-[9px] border border-[#DDDDE4] px-4 text-sm font-bold text-[#62656F]">Cancel</button>

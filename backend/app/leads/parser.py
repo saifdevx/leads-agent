@@ -26,6 +26,11 @@ NOISE_PREFIXES = (
     "instagram", "facebook", "linkedin", "google", "sign in", "images",
     "videos", "maps", "more results", "people also", "sponsored",
 )
+GENERIC_COMPANY_TITLES = {
+    "home", "contact", "contact us", "about", "about us", "our services", "services",
+    "pressure washing", "commercial pressure washing", "residential pressure washing",
+    "solar installation", "solar installer", "solar installers", "solar panel installers",
+}
 
 
 @dataclass(frozen=True)
@@ -71,12 +76,23 @@ def _company_from_domain(domain: str | None) -> str | None:
     return " ".join(word.capitalize() for word in label.split())
 
 
+def is_generic_company_name(value: str | None) -> bool:
+    if not value:
+        return True
+    normalized = " ".join(value.lower().split()).strip(" -–—|•·")
+    if normalized in GENERIC_COMPANY_TITLES:
+        return True
+    if normalized.startswith(("expert ", "professional ")) and " services" in normalized:
+        return True
+    return False
+
+
 def _looks_like_name(line: str) -> bool:
     candidate = " ".join(line.split()).strip(" -–—|•·")
     lowered = candidate.lower()
     if len(candidate) < 2 or len(candidate) > 120:
         return False
-    if "@" in candidate or URL_RE.search(candidate) or PHONE_RE.fullmatch(candidate):
+    if "@" in candidate or URL_RE.search(candidate) or valid_phone(candidate):
         return False
     if lowered.startswith(NOISE_PREFIXES):
         return False
@@ -86,18 +102,41 @@ def _looks_like_name(line: str) -> bool:
 
 
 def _guess_company(lines: list[str], domain: str | None) -> str | None:
+    domain_name = _company_from_domain(domain)
     for line in lines[:6]:
         cleaned = " ".join(line.split()).strip()
         if not _looks_like_name(cleaned):
             continue
-        # Google/social result titles often contain separators followed by source names.
         for separator in (" | ", " · ", " - ", " – ", " — "):
             if separator in cleaned:
-                first = cleaned.split(separator, 1)[0].strip()
-                if _looks_like_name(first):
+                parts = [part.strip() for part in cleaned.split(separator) if part.strip()]
+                # Search result titles often put the business name after the page title.
+                for candidate in reversed(parts):
+                    if _looks_like_name(candidate) and not is_generic_company_name(candidate):
+                        return candidate[:120]
+                first = parts[0] if parts else cleaned
+                if _looks_like_name(first) and not is_generic_company_name(first):
                     return first[:120]
-        return cleaned[:120]
-    return _company_from_domain(domain)
+        if not is_generic_company_name(cleaned):
+            return cleaned[:120]
+    return domain_name
+
+
+def valid_phone(value: str | None) -> str | None:
+    if not value:
+        return None
+    raw = " ".join(value.split()).strip()
+    digits = re.sub(r"\D", "", raw)
+    if len(digits) < 10 or len(digits) > 15:
+        return None
+    # Reject date-like values and long bare numeric IDs from social/profile URLs.
+    if re.fullmatch(r"(?:19|20)\d{2}[-/. ]\d{1,2}[-/. ]\d{1,2}", raw):
+        return None
+    if len(digits) > 11 and not raw.startswith("+") and not re.search(r"[()\s.-]", raw):
+        return None
+    if len(set(digits)) <= 2 and len(digits) >= 10:
+        return None
+    return raw
 
 
 def _blocks(text: str) -> list[str]:
@@ -110,11 +149,9 @@ def _blocks(text: str) -> list[str]:
     if not lines:
         return []
 
-    # Pasted search pages sometimes lose blank lines. Build contextual windows
-    # around lines that contain contact/location evidence.
     evidence_indexes = [
         index for index, line in enumerate(lines)
-        if EMAIL_RE.search(line) or URL_RE.search(line) or PHONE_RE.search(line)
+        if EMAIL_RE.search(line) or URL_RE.search(line) or valid_phone(next((m.group(1) for m in PHONE_RE.finditer(line)), None))
     ]
     if not evidence_indexes:
         return ["\n".join(lines)]
@@ -134,7 +171,12 @@ def _candidate_from_block(block: str, *, location: str | None, source_query: str
         [_clean_url(match.group(1)) for match in URL_RE.finditer(block)]
         + [_clean_url(match.group(1)) for match in BARE_SOCIAL_RE.finditer(block)]
     ))
-    phones = list(dict.fromkeys(" ".join(match.group(1).split()) for match in PHONE_RE.finditer(block)))
+
+    phone_text = URL_RE.sub(" ", BARE_SOCIAL_RE.sub(" ", block))
+    phones = list(dict.fromkeys(
+        phone for match in PHONE_RE.finditer(phone_text)
+        if (phone := valid_phone(match.group(1)))
+    ))
 
     socials: dict[str, str] = {}
     websites: list[str] = []
@@ -181,17 +223,33 @@ def _candidate_from_block(block: str, *, location: str | None, source_query: str
     ]
 
 
-def lead_identity(lead: ParsedLead) -> str | None:
+def lead_match_keys(lead: ParsedLead) -> set[str]:
+    keys: set[str] = set()
+    domain = (lead.domain or _host(lead.website or "") or "").lower().removeprefix("www.")
+    if domain and domain not in PUBLIC_EMAIL_DOMAINS:
+        keys.add(f"domain:{domain}")
+    if lead.instagram_url:
+        keys.add(f"instagram:{lead.instagram_url.lower().rstrip('/')}")
+    if lead.linkedin_url:
+        keys.add(f"linkedin:{lead.linkedin_url.lower().rstrip('/')}")
+    if lead.facebook_url:
+        keys.add(f"facebook:{lead.facebook_url.lower().rstrip('/')}")
     if lead.email:
-        return f"email:{lead.email.lower()}"
-    if lead.domain and lead.phone:
-        return f"domain-phone:{lead.domain.lower()}:{re.sub(r'\D', '', lead.phone)}"
-    if lead.website:
-        return f"website:{lead.website.lower().rstrip('/')}"
-    if lead.phone:
-        return f"phone:{re.sub(r'\D', '', lead.phone)}"
+        keys.add(f"email:{lead.email.lower()}")
+    if lead.phone and (phone := valid_phone(lead.phone)):
+        keys.add(f"phone:{re.sub(r'\D', '', phone)}")
     if lead.company_name and lead.region:
-        return f"company-region:{lead.company_name.lower()}:{lead.region.lower()}"
+        keys.add(f"company-region:{' '.join(lead.company_name.lower().split())}:{' '.join(lead.region.lower().split())}")
+    return keys
+
+
+def lead_identity(lead: ParsedLead) -> str | None:
+    keys = lead_match_keys(lead)
+    priority = ("domain:", "instagram:", "linkedin:", "facebook:", "email:", "phone:", "company-region:")
+    for prefix in priority:
+        match = next((key for key in keys if key.startswith(prefix)), None)
+        if match:
+            return match
     return None
 
 
@@ -201,10 +259,10 @@ def parse_leads(text: str, *, location: str | None = None, source_query: str | N
 
     for block in _blocks(text):
         for candidate in _candidate_from_block(block, location=location, source_query=source_query):
-            identity = lead_identity(candidate)
-            if not identity or identity in seen:
+            keys = lead_match_keys(candidate)
+            if not keys or seen.intersection(keys):
                 continue
-            seen.add(identity)
+            seen.update(keys)
             parsed.append(candidate)
 
     return parsed

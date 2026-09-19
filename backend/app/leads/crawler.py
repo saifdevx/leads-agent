@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ipaddress
+import json
 import re
 import socket
 from dataclasses import dataclass
@@ -9,7 +10,7 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
-from app.leads.parser import EMAIL_RE, PHONE_RE, SOCIAL_HOSTS
+from app.leads.parser import EMAIL_RE, PHONE_RE, SOCIAL_HOSTS, _company_from_domain, is_generic_company_name, valid_phone
 
 
 class UnsafeUrlError(ValueError):
@@ -18,6 +19,7 @@ class UnsafeUrlError(ValueError):
 
 @dataclass(frozen=True)
 class CrawledContactData:
+    business_name: str | None = None
     email: str | None = None
     phone: str | None = None
     linkedin_url: str | None = None
@@ -30,18 +32,44 @@ class _PageParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.text: list[str] = []
         self.links: list[str] = []
+        self.meta_names: list[str] = []
+        self.title_parts: list[str] = []
+        self.jsonld_parts: list[str] = []
+        self._in_title = False
+        self._in_jsonld = False
 
     def handle_data(self, data: str) -> None:
         clean = " ".join(data.split())
         if clean:
             self.text.append(clean)
+            if self._in_title:
+                self.title_parts.append(clean)
+            if self._in_jsonld:
+                self.jsonld_parts.append(data)
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
-        if tag.lower() != "a":
-            return
-        for key, value in attrs:
-            if key.lower() == "href" and value:
-                self.links.append(value.strip())
+        lowered = tag.lower()
+        attr_map = {key.lower(): value for key, value in attrs if value is not None}
+        if lowered == "a":
+            href = attr_map.get("href")
+            if href:
+                self.links.append(href.strip())
+        elif lowered == "meta":
+            marker = (attr_map.get("property") or attr_map.get("name") or "").lower()
+            content = (attr_map.get("content") or "").strip()
+            if marker in {"og:site_name", "application-name", "apple-mobile-web-app-title"} and content:
+                self.meta_names.append(content)
+        elif lowered == "title":
+            self._in_title = True
+        elif lowered == "script" and (attr_map.get("type") or "").lower() == "application/ld+json":
+            self._in_jsonld = True
+
+    def handle_endtag(self, tag: str) -> None:
+        lowered = tag.lower()
+        if lowered == "title":
+            self._in_title = False
+        elif lowered == "script":
+            self._in_jsonld = False
 
 
 def _ensure_public_host(url: str) -> None:
@@ -100,18 +128,69 @@ def _best_email(emails: list[str], final_url: str) -> str | None:
     return None
 
 
+def _jsonld_business_names(parts: list[str]) -> list[str]:
+    names: list[str] = []
+    for raw in parts:
+        try:
+            payload = json.loads(raw)
+        except Exception:
+            continue
+        stack = payload if isinstance(payload, list) else [payload]
+        while stack:
+            item = stack.pop()
+            if not isinstance(item, dict):
+                continue
+            graph = item.get("@graph")
+            if isinstance(graph, list):
+                stack.extend(graph)
+            item_type = item.get("@type")
+            types = {str(item_type)} if not isinstance(item_type, list) else {str(value) for value in item_type}
+            if types.intersection({"Organization", "LocalBusiness", "Corporation", "ProfessionalService", "HomeAndConstructionBusiness"}):
+                name = item.get("name")
+                if isinstance(name, str) and name.strip():
+                    names.append(name.strip())
+    return names
+
+
+def _best_business_name(parser: _PageParser, final_url: str) -> str | None:
+    candidates = [*_jsonld_business_names(parser.jsonld_parts), *parser.meta_names]
+    title = " ".join(parser.title_parts).strip()
+    if title:
+        for sep in (" | ", " – ", " — ", " - "):
+            if sep in title:
+                candidates.extend(part.strip() for part in title.split(sep) if part.strip())
+        candidates.append(title)
+    for candidate in candidates:
+        cleaned = " ".join(candidate.split()).strip()
+        if 2 <= len(cleaned) <= 120 and not is_generic_company_name(cleaned):
+            return cleaned
+    host = (urlparse(final_url).hostname or "").lower().removeprefix("www.")
+    return _company_from_domain(host)
+
+
 def _extract_contact_data(html: str, final_url: str) -> tuple[CrawledContactData, list[str]]:
     parser = _PageParser()
     parser.feed(html)
-    searchable = "\n".join(parser.text) + "\n" + html
+    searchable = "\n".join(parser.text)
     emails = list(dict.fromkeys(match.group(1).lower() for match in EMAIL_RE.finditer(searchable)))
-    best_email = _best_email(emails, final_url)
-    phones = list(dict.fromkeys(" ".join(match.group(1).split()) for match in PHONE_RE.finditer(searchable)))
 
     socials: dict[str, str] = {}
     internal_links: list[str] = []
+    href_emails: list[str] = []
+    href_phones: list[str] = []
     for href in parser.links:
-        if href.lower().startswith(("mailto:", "tel:", "javascript:", "#")):
+        lower = href.lower()
+        if lower.startswith("mailto:"):
+            candidate = href.split(":", 1)[1].split("?", 1)[0].strip()
+            if EMAIL_RE.fullmatch(candidate):
+                href_emails.append(candidate.lower())
+            continue
+        if lower.startswith("tel:"):
+            candidate = href.split(":", 1)[1].strip()
+            if phone := valid_phone(candidate):
+                href_phones.append(phone)
+            continue
+        if lower.startswith(("javascript:", "#")):
             continue
         absolute = urljoin(final_url, href)
         host = (urlparse(absolute).hostname or "").lower()
@@ -121,7 +200,18 @@ def _extract_contact_data(html: str, final_url: str) -> tuple[CrawledContactData
         elif _same_domain(final_url, absolute):
             internal_links.append(absolute)
 
+    emails = list(dict.fromkeys([*href_emails, *emails]))
+    best_email = _best_email(emails, final_url)
+    phones = list(dict.fromkeys([
+        *href_phones,
+        *[
+            phone for match in PHONE_RE.finditer(searchable)
+            if (phone := valid_phone(match.group(1)))
+        ],
+    ]))
+
     return CrawledContactData(
+        business_name=_best_business_name(parser, final_url),
         email=best_email,
         phone=phones[0] if phones else None,
         linkedin_url=socials.get("linkedin_url"),
@@ -132,6 +222,7 @@ def _extract_contact_data(html: str, final_url: str) -> tuple[CrawledContactData
 
 def _merge(left: CrawledContactData, right: CrawledContactData) -> CrawledContactData:
     return CrawledContactData(
+        business_name=left.business_name or right.business_name,
         email=left.email or right.email,
         phone=left.phone or right.phone,
         linkedin_url=left.linkedin_url or right.linkedin_url,
@@ -141,7 +232,7 @@ def _merge(left: CrawledContactData, right: CrawledContactData) -> CrawledContac
 
 
 class WebsiteCrawler:
-    def __init__(self, *, timeout: float = 12.0, max_bytes: int = 1_000_000) -> None:
+    def __init__(self, *, timeout: float = 10.0, max_bytes: int = 1_000_000) -> None:
         self.timeout = timeout
         self.max_bytes = max_bytes
         self.headers = {
@@ -181,7 +272,7 @@ class WebsiteCrawler:
             return CrawledContactData()
 
         data, links = _extract_contact_data(html, final_url)
-        if data.email and data.phone and data.linkedin_url and data.instagram_url:
+        if data.business_name and data.email and data.phone and (data.linkedin_url or data.instagram_url):
             return data
 
         priorities = []
@@ -190,7 +281,7 @@ class WebsiteCrawler:
             lowered = urlparse(link).path.lower()
             if any(pattern in lowered for pattern in patterns):
                 priorities.append(link)
-        for path in ("/contact", "/contact-us", "/about", "/team"):
+        for path in ("/contact", "/contact-us", "/about", "/about-us", "/team"):
             priorities.append(urljoin(final_url, path))
 
         seen = {final_url.rstrip("/")}

@@ -17,7 +17,7 @@ PROVIDERS: dict[str, dict[str, str | None]] = {
         "category": "ai",
         "label": "Gemini",
         "description": "Optional AI cleanup, relevance filtering and structured extraction.",
-        "default_model": "gemini-3.1-flash-lite",
+        "default_model": "gemini-3.5-flash-lite",
     },
     "openai": {
         "category": "ai",

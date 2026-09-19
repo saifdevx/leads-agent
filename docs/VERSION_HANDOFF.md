@@ -1,81 +1,39 @@
-# Handoff
+# Project Handoff — Discovery Quality & Reliability
 
-## Working features
+## Current working foundation
+- React/Vite/TypeScript frontend
+- FastAPI backend
+- Firebase Authentication
+- Turso SQL-over-HTTP persistence
+- BYOK credential encryption
+- Serper + Brave automated search
+- Gemini + OpenAI optional AI extraction
+- public website crawling
+- My Leads + export
+- manual search fallback
 
-- React/Vite application shell
-- FastAPI API
-- Firebase authentication and server verification
-- Turso persistence and migrations
-- User sync from Firebase to Turso
-- Automated Serper search
-- Automated Brave Search
-- Encrypted BYOK provider connections
-- Optional Gemini structured extraction
-- Optional OpenAI structured extraction
-- Public website contact crawling
-- Search progress jobs
-- Batched Turso lead writes
-- Manual search-result import fallback
-- Lead-list persistence
-- My Leads table
+## This update changes
+- provider key/log safety
+- AI provider validation/fallback
+- Turso transient retry behavior
+- frontend job-poll resilience
+- phone parsing
+- location/niche/result filtering
+- business-name extraction
+- duplicate business merging
+- adaptive search/crawl budgets
 
-## Provider strategy
+## No schema migration
+Existing Turso data is preserved. No migration is required.
 
-Current discovery providers:
+## Do not change during rollout
+- Firebase service-account credential
+- Turso database/token
+- `CREDENTIAL_ENCRYPTION_KEY`
+- real `.env` files
 
-```text
-Serper       Primary Google-style search
-Brave        Independent web-search coverage
-Gemini       Optional AI cleanup
-OpenAI       Optional AI cleanup
-```
+## Security note
+The prior Gemini key was visible in historical local logs because the old implementation placed the key in the request URL. Rotate it before reconnecting Gemini. This update moves authentication to the `x-goog-api-key` header and suppresses third-party HTTP request INFO logs.
 
-Future enrichment layer:
-
-```text
-Prospeo      Verified email / person enrichment
-Apollo       Decision-maker search + enrichment
-```
-
-Paid enrichment should only run after free/public discovery so credits are spent on missing information rather than data already found.
-
-## Private local configuration
-
-Environment variable names only:
-
-```text
-VITE_API_URL
-VITE_FIREBASE_API_KEY
-VITE_FIREBASE_AUTH_DOMAIN
-VITE_FIREBASE_PROJECT_ID
-VITE_FIREBASE_APP_ID
-VITE_FIREBASE_MESSAGING_SENDER_ID
-VITE_FIREBASE_STORAGE_BUCKET
-APP_NAME
-APP_VERSION
-APP_ENV
-CORS_ORIGINS
-LOG_LEVEL
-FIREBASE_PROJECT_ID
-FIREBASE_CREDENTIALS_PATH
-FIREBASE_SERVICE_ACCOUNT_JSON
-TURSO_DATABASE_URL
-TURSO_AUTH_TOKEN
-TURSO_TIMEOUT_SECONDS
-CREDENTIAL_ENCRYPTION_KEY
-```
-
-Never record credential values in handoff documents.
-
-## Do not change casually
-
-- Firebase UID as user ownership key
-- Turso as application database
-- Server-side verification of Firebase tokens
-- Server-side encrypted provider credentials
-- Search-provider adapters behind backend APIs
-- Database as the source of truth for leads/jobs
-
-## Next logical product layer
-
-Add verified enrichment providers (Prospeo/Apollo) after real-world automated discovery quality is tested with several niches.
+## Next product decision
+Repeat the Pressure washing / Texas / 25-lead benchmark. Only after lead quality is materially cleaner should the project add Prospeo/Apollo enrichment. Outreach remains later.

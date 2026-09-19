@@ -1,48 +1,37 @@
-# Lead Platform
+# Lead Platform — Discovery Quality & Reliability Update
 
-A free-first/BYOK lead-generation web application built with React/Vite, FastAPI, Firebase Authentication and Turso.
+This update improves the existing automated discovery build rather than adding another major feature. The goal is to make the current **Niche + Location + Lead target → Find Leads** workflow more accurate and resilient before spending credits on Prospeo/Apollo enrichment.
 
-## What this build adds
+## Important security action first
 
-The main Find Leads workflow is now automated when a supported search provider is connected.
+A Gemini API key appeared in earlier local HTTP logs. Treat that key as exposed.
 
-A user can enter:
+Before using Gemini again:
 
-```text
-Niche: Solar panel installers
-Location: Texas, USA
-Leads wanted: 100
-```
+1. Revoke/regenerate the old Gemini key in Google AI Studio / Google Cloud.
+2. Do not paste the replacement key into chat or source files.
+3. After installing this update, use **Settings → Gemini → Replace key**.
 
-and click **Find Leads**. The backend then:
+This build sends the Gemini key through the `x-goog-api-key` header and suppresses third-party HTTP request INFO logs so provider keys are not printed in URLs.
 
-1. Generates high-signal prospecting queries based on the proven Google workflow.
-2. Searches through the selected provider. Smart mode prefers Serper for Google-style results and falls back to Brave when Serper is not connected.
-3. Extracts contact/business information from search-result evidence.
-4. Optionally uses Gemini or OpenAI structured output to improve extraction and relevance filtering.
-5. Checks public company websites for missing email/phone/social contact information.
-6. Deduplicates results.
-7. Grounds AI-returned contact fields back to actual search evidence, then saves useful leads to Turso in batches.
-8. Exposes live progress in the UI.
+## What changed
 
-The existing manual copy/paste workflow remains available as a fallback.
+- Better relevance/location filtering.
+- False social IDs and dates are no longer accepted as phone numbers.
+- Obvious template/demo/directory/job/course results are filtered out.
+- Website metadata/JSON-LD improves business names.
+- Duplicate businesses merge contact data rather than creating duplicate rows.
+- Gemini validation now performs an actual generation request.
+- Gemini default model for new connections is `gemini-3.5-flash-lite`.
+- OpenAI validation also checks the generation path used by discovery.
+- Smart AI mode tries Gemini, then OpenAI when both are connected, then deterministic extraction.
+- Temporary Turso failures retry automatically.
+- Temporary job-status 503 responses no longer stop frontend polling.
+- Search and crawl budgets adapt to low-yield runs while staying bounded.
 
-## BYOK integrations
+No database migration and no new package are required.
 
-Settings now supports encrypted user-owned API keys for:
-
-- **Serper** — Google-style automated search. Recommended primary discovery source.
-- **Brave Search** — independent web-search coverage.
-- **Gemini** — optional AI cleanup / structured extraction.
-- **OpenAI** — optional AI cleanup / structured extraction.
-
-Plaintext API keys are validated by the backend and encrypted before they are stored in Turso. They are never returned to the browser after saving.
-
-## Important design decision
-
-Google Places is not used as a persistent lead-data source in this build. Google Maps Platform places restrictions on storing/caching Places API content. We can revisit a compliant Places integration later if it materially improves the product.
-
-## Updating an existing local project
+## Updating the existing project
 
 Copy this package over the existing repository and allow source files to be replaced.
 
@@ -59,30 +48,19 @@ frontend/node_modules/
 
 Do not replace or commit real `.env` files.
 
-## New backend environment variable
+## Backend environment
 
-Generate one Fernet encryption key and keep it stable for the lifetime of the stored provider credentials:
+Keep all current Firebase, Turso and credential-encryption values.
 
-```powershell
-cd D:\Leads-Agent\leads-agent\backend
-.venv\Scripts\Activate.ps1
-python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
-```
-
-Copy the generated value into `backend/.env`:
+Recommended change in `backend/.env`:
 
 ```env
-APP_VERSION=0.5.0
-CREDENTIAL_ENCRYPTION_KEY=PASTE_GENERATED_VALUE_HERE
+TURSO_TIMEOUT_SECONDS=15
 ```
 
-Keep your existing Firebase and Turso values unchanged.
+Do **not** regenerate `CREDENTIAL_ENCRYPTION_KEY`.
 
-**Do not regenerate this key after provider credentials have been saved.** Existing encrypted keys would no longer be decryptable.
-
-## Frontend setup
-
-No new frontend package is required.
+## Frontend checks
 
 ```powershell
 cd D:\Leads-Agent\leads-agent\frontend
@@ -93,9 +71,7 @@ npm run build
 npm run dev
 ```
 
-## Backend setup
-
-This build explicitly adds `cryptography` as a direct dependency for BYOK credential encryption. It may already exist through Firebase, but install from the requirements file so the dependency is intentional and reproducible.
+## Backend checks
 
 ```powershell
 cd D:\Leads-Agent\leads-agent\backend
@@ -106,45 +82,61 @@ python -m app.db.migrate
 uvicorn app.main:app --reload --port 8000
 ```
 
-There is no new database migration because `provider_connections` and `jobs` already exist in the current schema.
+Expected migration result:
 
-## First automated-search test
+```text
+Database schema is already up to date.
+```
 
-1. Sign in.
-2. Open **Settings**.
-3. Connect **Serper** or **Brave Search**.
-4. Optionally connect Gemini or OpenAI.
-5. Return to **Find Leads**.
-6. Enter a niche/location and request 25 leads for the first test.
-7. Click **Find Leads**.
-8. Watch progress until complete.
-9. Open **My Leads** and review quality/source data.
+## Reconnect Gemini
 
-For the first real quality test, connect **Serper + Gemini** (or OpenAI). Serper most closely automates the prior Google-search workflow; AI improves structured extraction and relevance filtering without being allowed to invent missing contact details.
+After rotating the leaked key:
 
-## Search behavior and cost control
+1. Open **Settings**.
+2. Choose **Gemini → Replace key**.
+3. Leave the suggested model `gemini-3.5-flash-lite` unless you intentionally want another compatible model.
+4. Connect.
 
-The app uses a bounded search budget (up to 30 search API calls per run in this build) and stops when either:
+The backend now tests a real `generateContent` request before accepting the key. A key that can list models but cannot generate will no longer appear healthy.
 
-- the requested number of useful unique leads is reached, or
-- the search-call budget is reached.
+If Gemini still cannot generate, leave AI cleanup on **Automatic** if OpenAI is connected, or switch AI cleanup **Off** temporarily. Search and deterministic extraction still work.
 
-The automated workflow does not directly scrape Google HTML, Instagram, LinkedIn or Facebook. It uses supported search APIs to retrieve indexed public search results, then optionally visits public company websites.
+## Recommended repeat test
 
-## AI behavior
+Use the same benchmark as the previous run:
 
-Gemini/OpenAI are optional. Search still works without them using deterministic extraction.
+```text
+Business / niche: Pressure washing
+Location: Texas, USA
+Leads wanted: 25
+Search source: Smart / automatic
+AI cleanup: Automatic
+Check company websites: On
+```
 
-When enabled, AI is used to:
+Review the resulting list for:
 
-- associate search snippets with the correct business,
-- reject obviously irrelevant pages/directories/jobs/articles,
-- extract structured fields without inventing missing contact details.
+- actual Texas relevance,
+- real company names,
+- plausible phone numbers,
+- email count,
+- duplicate businesses,
+- demo/template sites,
+- total search calls and runtime.
 
-The AI prompt explicitly requires evidence-grounded extraction; missing data remains missing.
+Examples that should now be filtered/fixed:
 
-## Next provider layer
+- `2024-05-15` must not become a phone number.
+- long Facebook numeric IDs must not become phone numbers.
+- an explicit `Central Florida` result should not be saved for a Texas search.
+- `themereserve.com` demo/template results should not count as leads.
+- two rows from the same business domain should merge contact data into one business.
 
-After automated discovery quality is validated, the next provider layer should add verified enrichment/decision-maker sources such as Prospeo and Apollo. That layer should only spend credits on leads that still need verified contact data.
+## Next step after this quality test
 
-See `docs/TEST_CHECKLIST.md` for acceptance tests and `docs/ROLLBACK.md` for rollback guidance.
+Do not add outreach yet. If this benchmark is materially cleaner, the next provider layer should be:
+
+1. **Prospeo** — verify/fill missing emails.
+2. **Apollo** — identify owners/founders/decision makers where needed.
+
+Paid enrichment should be applied only after free/public discovery and deduplication, so credits are spent on good candidate businesses rather than noisy search results.

@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     firebase_service_account_json: str = ""
     turso_database_url: str = ""
     turso_auth_token: str = ""
-    turso_timeout_seconds: float = 10.0
+    turso_timeout_seconds: float = 15.0
     credential_encryption_key: str = ""
 
     model_config = SettingsConfigDict(

@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.db.client import TursoHttpClient
-from app.leads.parser import ParsedLead, lead_identity
+from app.leads.parser import ParsedLead, is_generic_company_name, lead_match_keys
 
 
 class LeadListNotFoundError(LookupError):
@@ -13,6 +13,81 @@ class LeadListNotFoundError(LookupError):
 
 def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _to_parsed(row: dict) -> ParsedLead:
+    return ParsedLead(
+        company_name=row.get("company_name"),
+        website=row.get("website"),
+        domain=row.get("domain"),
+        first_name=row.get("first_name"),
+        last_name=row.get("last_name"),
+        job_title=row.get("job_title"),
+        email=row.get("email"),
+        email_status=row.get("email_status"),
+        phone=row.get("phone"),
+        linkedin_url=row.get("linkedin_url"),
+        instagram_url=row.get("instagram_url"),
+        facebook_url=row.get("facebook_url"),
+        region=row.get("region"),
+        source=row.get("source") or "manual_search_import",
+        source_url=row.get("source_url"),
+        source_query=row.get("source_query"),
+        score=row.get("score"),
+    )
+
+
+def _better_name(current: str | None, incoming: str | None) -> str | None:
+    if not incoming:
+        return current
+    if not current or (is_generic_company_name(current) and not is_generic_company_name(incoming)):
+        return incoming
+    return current
+
+
+
+
+def _merge_parsed(current: ParsedLead, incoming: ParsedLead) -> ParsedLead:
+    return ParsedLead(
+        company_name=_better_name(current.company_name, incoming.company_name),
+        website=current.website or incoming.website,
+        domain=current.domain or incoming.domain,
+        first_name=current.first_name or incoming.first_name,
+        last_name=current.last_name or incoming.last_name,
+        job_title=current.job_title or incoming.job_title,
+        email=current.email or incoming.email,
+        email_status=current.email_status or incoming.email_status,
+        phone=current.phone or incoming.phone,
+        linkedin_url=current.linkedin_url or incoming.linkedin_url,
+        instagram_url=current.instagram_url or incoming.instagram_url,
+        facebook_url=current.facebook_url or incoming.facebook_url,
+        region=current.region or incoming.region,
+        source=current.source or incoming.source,
+        source_url=current.source_url or incoming.source_url,
+        source_query=current.source_query or incoming.source_query,
+        score=max(float(current.score or 0.0), float(incoming.score or 0.0)) or None,
+    )
+
+def _merge_row(row: dict, incoming: ParsedLead) -> dict:
+    return {
+        "company_name": _better_name(row.get("company_name"), incoming.company_name),
+        "website": row.get("website") or incoming.website,
+        "domain": row.get("domain") or incoming.domain,
+        "first_name": row.get("first_name") or incoming.first_name,
+        "last_name": row.get("last_name") or incoming.last_name,
+        "job_title": row.get("job_title") or incoming.job_title,
+        "email": row.get("email") or incoming.email,
+        "email_status": row.get("email_status") or incoming.email_status,
+        "phone": row.get("phone") or incoming.phone,
+        "linkedin_url": row.get("linkedin_url") or incoming.linkedin_url,
+        "instagram_url": row.get("instagram_url") or incoming.instagram_url,
+        "facebook_url": row.get("facebook_url") or incoming.facebook_url,
+        "region": row.get("region") or incoming.region,
+        "source": row.get("source") or incoming.source,
+        "source_url": row.get("source_url") or incoming.source_url,
+        "source_query": row.get("source_query") or incoming.source_query,
+        "score": max(float(row.get("score") or 0.0), float(incoming.score or 0.0)) or None,
+    }
 
 
 class LeadRepository:
@@ -114,43 +189,73 @@ class LeadRepository:
         lead_list = self.get_lead_list(user_id, list_id)
         existing_rows = self.database.execute(
             """
-            SELECT email, domain, phone, company_name, website, region
+            SELECT id, company_name, website, domain, first_name, last_name, job_title,
+                   email, email_status, phone, linkedin_url, instagram_url, facebook_url,
+                   region, source, source_url, source_query, score
             FROM leads WHERE user_id = ? AND list_id = ?
             """,
             (user_id, list_id),
         ).rows
 
-        existing_keys: set[str] = set()
+        existing_key_to_row: dict[str, dict] = {}
         for row in existing_rows:
-            existing = ParsedLead(
-                company_name=row.get("company_name"),
-                website=row.get("website"),
-                domain=row.get("domain"),
-                email=row.get("email"),
-                phone=row.get("phone"),
-                region=row.get("region"),
-            )
-            key = lead_identity(existing)
-            if key:
-                existing_keys.add(key)
+            for key in lead_match_keys(_to_parsed(row)):
+                existing_key_to_row[key] = row
 
         unique: list[ParsedLead] = []
+        pending_key_to_index: dict[str, int] = {}
         duplicate_count = 0
         skipped_count = 0
+        merge_statements_by_id: dict[str, tuple[str, tuple, bool]] = {}
+
         for lead in leads:
-            key = lead_identity(lead)
-            if not key:
+            keys = lead_match_keys(lead)
+            if not keys:
                 skipped_count += 1
                 continue
-            if key in existing_keys:
+
+            existing_match = next((existing_key_to_row[key] for key in keys if key in existing_key_to_row), None)
+            if existing_match:
                 duplicate_count += 1
+                merged = _merge_row(existing_match, lead)
+                statement = (
+                    """
+                    UPDATE leads SET company_name = ?, website = ?, domain = ?, first_name = ?, last_name = ?,
+                        job_title = ?, email = ?, email_status = ?, phone = ?, linkedin_url = ?, instagram_url = ?,
+                        facebook_url = ?, region = ?, source = ?, source_url = ?, source_query = ?, score = ?, updated_at = ?
+                    WHERE id = ? AND user_id = ? AND list_id = ?
+                    """,
+                    (
+                        merged["company_name"], merged["website"], merged["domain"], merged["first_name"],
+                        merged["last_name"], merged["job_title"], merged["email"], merged["email_status"],
+                        merged["phone"], merged["linkedin_url"], merged["instagram_url"], merged["facebook_url"],
+                        merged["region"], merged["source"], merged["source_url"], merged["source_query"],
+                        merged["score"], _now(), existing_match["id"], user_id, list_id,
+                    ),
+                    False,
+                )
+                merge_statements_by_id[str(existing_match["id"])] = statement
+                existing_match.update(merged)
+                for key in lead_match_keys(_to_parsed(existing_match)):
+                    existing_key_to_row[key] = existing_match
                 continue
-            existing_keys.add(key)
+
+            pending_index = next((pending_key_to_index[key] for key in keys if key in pending_key_to_index), None)
+            if pending_index is not None:
+                duplicate_count += 1
+                unique[pending_index] = _merge_parsed(unique[pending_index], lead)
+                for key in lead_match_keys(unique[pending_index]):
+                    pending_key_to_index[key] = pending_index
+                continue
+
+            pending_index = len(unique)
             unique.append(lead)
+            for key in keys:
+                pending_key_to_index[key] = pending_index
 
         now = _now()
         inserted_ids: list[str] = []
-        statements: list[tuple[str, tuple, bool]] = []
+        statements: list[tuple[str, tuple, bool]] = [*merge_statements_by_id.values()]
         for lead in unique:
             lead_id = str(uuid4())
             inserted_ids.append(lead_id)
@@ -164,11 +269,10 @@ class LeadRepository:
                 """,
                 (
                     lead_id, user_id, list_id, lead.company_name, lead.website, lead.domain,
-                    getattr(lead, "first_name", None), getattr(lead, "last_name", None),
-                    getattr(lead, "job_title", None), lead.email, lead.email_status, lead.phone,
+                    lead.first_name, lead.last_name, lead.job_title, lead.email, lead.email_status, lead.phone,
                     lead.linkedin_url, lead.instagram_url, lead.facebook_url,
                     lead.region or lead_list.get("location"), lead.source, lead.source_url,
-                    lead.source_query, getattr(lead, "score", None), now, now,
+                    lead.source_query, lead.score, now, now,
                 ),
                 False,
             ))

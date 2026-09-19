@@ -173,3 +173,44 @@ def test_execute_batch_uses_one_pipeline_for_multiple_statements():
     assert len(results) == 2
     assert results[0].affected_row_count == 1
     assert results[1].rows == [{"count": 2}]
+
+
+def test_turso_retries_transient_503_before_succeeding():
+    attempts = {"count": 0}
+
+    def handler(_: httpx.Request) -> httpx.Response:
+        attempts["count"] += 1
+        if attempts["count"] < 3:
+            return httpx.Response(503, json={"error": "temporary"})
+        return httpx.Response(
+            200,
+            json={
+                "baton": None,
+                "base_url": None,
+                "results": [
+                    {
+                        "type": "ok",
+                        "response": {
+                            "type": "execute",
+                            "result": {
+                                "cols": [{"name": "ok"}],
+                                "rows": [[{"type": "integer", "value": "1"}]],
+                                "affected_row_count": 0,
+                                "last_insert_rowid": None,
+                                "rows_read": 1,
+                                "rows_written": 0,
+                            },
+                        },
+                    },
+                    {"type": "ok", "response": {"type": "close"}},
+                ],
+            },
+        )
+
+    client = TursoHttpClient(
+        "https://lead-db.example.turso.io",
+        "token",
+        transport=httpx.MockTransport(handler),
+    )
+    assert client.execute("SELECT 1 AS ok").rows == [{"ok": 1}]
+    assert attempts["count"] == 3

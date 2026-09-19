@@ -50,3 +50,29 @@ solarworks@gmail.com
 
     assert len(leads) == 1
     assert leads[0].email == "solarworks@gmail.com"
+
+
+def test_parser_rejects_social_ids_dates_and_other_false_phones():
+    raw = """
+Prime Pressure Washing
+https://www.facebook.com/100063184961392/
+Established 2024-05-15
+
+Real Wash Co
+https://realwash.example/contact
+Call +1 (214) 555-0198
+"""
+    leads = parse_leads(raw, location="Texas")
+    prime = next(lead for lead in leads if lead.company_name == "Prime Pressure Washing")
+    real = next(lead for lead in leads if lead.company_name == "Real Wash Co")
+    assert prime.phone is None
+    assert real.phone == "+1 (214) 555-0198"
+
+
+def test_business_identity_prefers_domain_over_different_emails():
+    from app.leads.parser import ParsedLead, lead_identity
+
+    first = ParsedLead(domain="examplewash.com", website="https://examplewash.com", email=None)
+    second = ParsedLead(domain="examplewash.com", website="https://examplewash.com/contact", email="hello@examplewash.com")
+    assert lead_identity(first) == "domain:examplewash.com"
+    assert lead_identity(second) == "domain:examplewash.com"

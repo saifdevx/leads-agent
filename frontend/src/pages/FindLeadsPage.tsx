@@ -42,6 +42,7 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
 
   const [busy, setBusy] = useState<'search' | 'plan' | 'import' | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [pollWarning, setPollWarning] = useState<string | null>(null)
 
   async function refreshProviders() {
     try {
@@ -63,14 +64,20 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
         const token = await getToken()
         const next = await getJob(token, jobId as string)
         if (cancelled) return
+        setPollWarning(null)
         setJob(next)
         if (next.status === 'complete' || next.status === 'failed') {
           setBusy(null)
           return
         }
-        pollTimer.current = window.setTimeout(() => void poll(), 1800)
+        pollTimer.current = window.setTimeout(() => void poll(), 4000)
       } catch (nextError) {
         if (cancelled) return
+        if (nextError instanceof ApiRequestError && nextError.status === 503) {
+          setPollWarning('Temporary connection hiccup — the search is still running. Retrying automatically…')
+          pollTimer.current = window.setTimeout(() => void poll(), 5000)
+          return
+        }
         setError(nextError instanceof ApiRequestError ? nextError.message : 'Could not read search progress.')
         setBusy(null)
       }
@@ -90,6 +97,7 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
   async function startSearch() {
     setBusy('search')
     setError(null)
+    setPollWarning(null)
     setJob(null)
     try {
       const token = await getToken()
@@ -233,6 +241,7 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
             </div>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#E9E7F1]"><div className="h-full rounded-full bg-[#7B61FF] transition-all" style={{ width: `${Math.max(2, Math.min(100, percent))}%` }} /></div>
             {job.result.errors && job.result.errors.length > 0 && <p className="mt-3 text-xs leading-5 text-[#8A6C41]">Some sources had issues, but the search continued where possible.</p>}
+            {pollWarning && <p className="mt-3 rounded-[8px] bg-[#FFF8E8] px-3 py-2 text-xs font-medium leading-5 text-[#82631F]">{pollWarning}</p>}
             {job.status === 'complete' && <button type="button" onClick={onViewLeads} className="focus-ring mt-4 inline-flex h-10 items-center gap-2 rounded-[9px] bg-[#7B61FF] px-4 text-sm font-bold text-white">View My Leads <Icon name="arrow" className="h-4 w-4" /></button>}
           </div>
         )}

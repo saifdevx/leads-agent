@@ -69,7 +69,8 @@ def _prompt(results: list[SearchResult], niche: str, location: str | None) -> st
         f"to the target niche {niche!r}" + (f" and location {location!r}. " if location else ". ") +
         "Personal Gmail/Yahoo-style emails may be included when explicitly shown for the business. "
         "Use confidence from 0 to 1 based only on evidence. Mark irrelevant directories, jobs, courses, "
-        "news, generic articles and unrelated results as relevant=false.\n\nEVIDENCE:\n" +
+        "news, generic articles, template/demo sites and unrelated results as relevant=false. "
+        "If the evidence explicitly names a conflicting location, mark the lead irrelevant.\n\nEVIDENCE:\n" +
         json.dumps(evidence, ensure_ascii=False)
     )
 
@@ -109,18 +110,35 @@ class OpenAIExtractor:
         self.model = model
         self.timeout = timeout
 
-    def validate(self) -> None:
-        response = httpx.get(
-            "https://api.openai.com/v1/models",
-            headers={"Authorization": f"Bearer {self.api_key}"},
-            timeout=20.0,
-        )
+    def _request(self, payload: dict, *, timeout: float | None = None) -> httpx.Response:
+        try:
+            return httpx.post(
+                "https://api.openai.com/v1/responses",
+                headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+                json=payload,
+                timeout=timeout or self.timeout,
+            )
+        except httpx.RequestError as exc:
+            raise ProviderRequestError("OpenAI could not be reached.") from exc
+
+    @staticmethod
+    def _check(response: httpx.Response) -> None:
         if response.status_code in (401, 403):
-            raise ProviderCredentialsError("OpenAI rejected the API key.")
+            raise ProviderCredentialsError("OpenAI rejected the API key or project access.")
         if response.status_code == 429:
             raise ProviderRateLimitError("OpenAI rate limit or quota reached.")
         if not response.is_success:
             raise ProviderRequestError(f"OpenAI returned HTTP {response.status_code}.")
+
+    def validate(self) -> None:
+        # Validate the path we actually use, not merely model-list access. This costs only a tiny request.
+        response = self._request({
+            "model": self.model,
+            "input": "Reply exactly with OK.",
+            "max_output_tokens": 16,
+            "reasoning": {"effort": "none"},
+        }, timeout=25.0)
+        self._check(response)
 
     def extract(self, results: list[SearchResult], niche: str, location: str | None) -> list[AIExtractedLead]:
         if not results:
@@ -128,6 +146,7 @@ class OpenAIExtractor:
         payload = {
             "model": self.model,
             "input": _prompt(results, niche, location),
+            "reasoning": {"effort": "none"},
             "text": {
                 "format": {
                     "type": "json_schema",
@@ -137,21 +156,8 @@ class OpenAIExtractor:
                 }
             },
         }
-        try:
-            response = httpx.post(
-                "https://api.openai.com/v1/responses",
-                headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
-                json=payload,
-                timeout=self.timeout,
-            )
-        except httpx.RequestError as exc:
-            raise ProviderRequestError("OpenAI could not be reached.") from exc
-        if response.status_code in (401, 403):
-            raise ProviderCredentialsError("OpenAI rejected the API key.")
-        if response.status_code == 429:
-            raise ProviderRateLimitError("OpenAI rate limit or quota reached.")
-        if not response.is_success:
-            raise ProviderRequestError(f"OpenAI returned HTTP {response.status_code}.")
+        response = self._request(payload)
+        self._check(response)
         data = response.json()
         text = data.get("output_text")
         if not text:
@@ -168,46 +174,58 @@ class OpenAIExtractor:
 
 
 class GeminiExtractor:
-    def __init__(self, api_key: str, model: str = "gemini-3.1-flash-lite", *, timeout: float = 45.0):
+    def __init__(self, api_key: str, model: str = "gemini-3.5-flash-lite", *, timeout: float = 45.0):
         self.api_key = api_key
         self.model = model
         self.timeout = timeout
 
-    def validate(self) -> None:
-        response = httpx.get(
-            "https://generativelanguage.googleapis.com/v1beta/models",
-            params={"key": self.api_key},
-            timeout=20.0,
-        )
+    def _request(self, payload: dict, *, timeout: float | None = None) -> httpx.Response:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
+        try:
+            return httpx.post(
+                url,
+                headers={"x-goog-api-key": self.api_key, "Content-Type": "application/json"},
+                json=payload,
+                timeout=timeout or self.timeout,
+            )
+        except httpx.RequestError as exc:
+            raise ProviderRequestError("Gemini could not be reached.") from exc
+
+    @staticmethod
+    def _check(response: httpx.Response) -> None:
         if response.status_code in (400, 401, 403):
-            raise ProviderCredentialsError("Gemini rejected the API key.")
+            raise ProviderCredentialsError(
+                "Gemini cannot generate with this key/project. Check API access, key restrictions, region/billing settings, then reconnect."
+            )
         if response.status_code == 429:
             raise ProviderRateLimitError("Gemini rate limit or quota reached.")
         if not response.is_success:
             raise ProviderRequestError(f"Gemini returned HTTP {response.status_code}.")
 
+    def validate(self) -> None:
+        # Test the same generateContent capability discovery uses. Listing models alone can succeed
+        # even when generation is not permitted for the key/project.
+        response = self._request(
+            {
+                "contents": [{"parts": [{"text": "Reply exactly with OK."}]}],
+                "generationConfig": {"maxOutputTokens": 16},
+            },
+            timeout=25.0,
+        )
+        self._check(response)
+
     def extract(self, results: list[SearchResult], niche: str, location: str | None) -> list[AIExtractedLead]:
         if not results:
             return []
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:generateContent"
         payload = {
             "contents": [{"parts": [{"text": _prompt(results, niche, location)}]}],
             "generationConfig": {
                 "responseMimeType": "application/json",
                 "responseJsonSchema": LEAD_SCHEMA,
-                "temperature": 0.1,
             },
         }
-        try:
-            response = httpx.post(url, params={"key": self.api_key}, json=payload, timeout=self.timeout)
-        except httpx.RequestError as exc:
-            raise ProviderRequestError("Gemini could not be reached.") from exc
-        if response.status_code in (400, 401, 403):
-            raise ProviderCredentialsError("Gemini rejected the API key or model configuration.")
-        if response.status_code == 429:
-            raise ProviderRateLimitError("Gemini rate limit or quota reached.")
-        if not response.is_success:
-            raise ProviderRequestError(f"Gemini returned HTTP {response.status_code}.")
+        response = self._request(payload)
+        self._check(response)
         data = response.json()
         candidates = data.get("candidates") or []
         parts = (((candidates[0] if candidates else {}).get("content") or {}).get("parts") or [])
@@ -222,6 +240,6 @@ def validate_ai_provider(provider: str, api_key: str, model: str | None = None) 
         OpenAIExtractor(api_key, model or "gpt-5.6-luna").validate()
         return
     if provider == "gemini":
-        GeminiExtractor(api_key, model or "gemini-3.1-flash-lite").validate()
+        GeminiExtractor(api_key, model or "gemini-3.5-flash-lite").validate()
         return
     raise ValueError(provider)

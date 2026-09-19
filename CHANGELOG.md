@@ -1,34 +1,38 @@
 # Changelog
 
-## Automated lead discovery + BYOK integrations
+## Discovery quality and reliability update
 
-### Added
-- Fully automated lead search through Serper and Brave Search.
-- User-owned search-provider API keys.
-- User-owned Gemini and OpenAI API keys.
-- Server-side Fernet encryption for provider credentials.
-- Provider validation/connect/disconnect endpoints.
-- Functional Settings integration screen.
-- Background search jobs with progress polling.
-- Website contact-page crawling for missing public contact details.
-- Optional AI structured extraction and relevance filtering.
-- Automatic fallback to deterministic extraction if no AI provider is connected or AI extraction fails.
-- Search-call and website-crawl limits to control cost/runaway work.
-- Evidence post-validation for AI-returned emails, phones and URLs.
-- Cost-aware Smart search mode: Serper first, Brave fallback.
-- Batched Turso writes for lead imports.
-- Reduced Turso latency by avoiding repeated user-sync/provider lookups on every protected API call.
-- Provider credentials are snapshotted once per discovery job instead of re-reading Turso for every query.
-- Manual paste/import kept as a fallback mode.
+### Security
+- Gemini API keys are now sent in the `x-goog-api-key` header instead of the URL query string.
+- Third-party `httpx` / `httpcore` INFO request logging is suppressed so provider request URLs are not printed to application logs.
+- Gemini and OpenAI connections now validate an actual tiny generation request rather than only checking account/model listing access.
+- Existing encrypted BYOK storage remains unchanged.
 
-### Changed
-- Find Leads now defaults to one-click automatic discovery.
-- Search queries prioritize the proven Instagram/Gmail-style discovery patterns.
-- Weak social-only results do not count toward the requested lead target unless a practical contact path is found.
-- My Leads receives automatically discovered records from connected providers.
+### Discovery quality
+- Rejects obvious out-of-location results when a different US state is explicitly present.
+- Rejects common template/demo, directory, job, course and other low-quality result types.
+- Fixes false phone numbers caused by Facebook numeric IDs, dates and other digit strings.
+- Company-name extraction now avoids generic page titles such as `Our Services` / `Contact Us` when better evidence is available.
+- Website crawler now reads JSON-LD organization names and `og:site_name` metadata.
+- Website crawler now uses `mailto:` and `tel:` links as stronger contact evidence.
+- Website crawling can improve generic company names as well as missing contact details.
+- Business identity now prefers company domain/social identity before email, reducing duplicate rows when an email is discovered later.
+- Duplicate discoveries merge new contact details into the existing business instead of creating a second lead.
+- AI extraction remains evidence-grounded and cannot save invented contact fields.
+
+### Reliability and cost control
+- Turso requests retry transient network/429/5xx failures before surfacing an outage.
+- Frontend job polling retries temporary database 503 responses instead of stopping the running search.
+- Polling interval increased to reduce database load.
+- Automatic AI mode falls back from Gemini to OpenAI when both are connected, then to deterministic extraction if neither AI provider succeeds.
+- Invalid AI provider credentials are marked as errors so a broken key is not repeatedly treated as healthy.
+- Search budget is now adaptive and slightly larger for low-yield searches, while retaining a hard upper bound.
+- Website crawl budget is adaptive and bounded.
 
 ### Preserved
 - Firebase authentication.
-- Turso persistence and existing schema.
-- Manual lead import.
-- Existing lead-list and lead-table behavior.
+- Turso schema and existing user data.
+- Serper and Brave integrations.
+- Manual search/import fallback.
+- My Leads and export behavior.
+- Existing encrypted provider credentials.

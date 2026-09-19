@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import math
+import time
 from dataclasses import dataclass
 from typing import Any, Sequence
 
@@ -177,29 +178,45 @@ class TursoHttpClient:
         }
         payload = {"baton": None, "requests": requests}
 
-        try:
-            with httpx.Client(
-                timeout=self.timeout_seconds,
-                transport=self.transport,
-            ) as client:
-                response = client.post(
-                    f"{self.base_url}/v3/pipeline",
-                    headers=headers,
-                    json=payload,
-                )
-        except httpx.RequestError as exc:
-            raise DatabaseUnavailableError("Turso could not be reached.") from exc
+        response: httpx.Response | None = None
+        last_error: Exception | None = None
+        retry_delays = (0.0, 0.4, 1.0)
 
-        if response.status_code in (401, 403):
-            raise DatabaseConfigurationError(
-                "Turso rejected the configured database credentials."
-            )
-        if response.status_code >= 500:
-            raise DatabaseUnavailableError("Turso is temporarily unavailable.")
-        if not response.is_success:
-            raise DatabaseConfigurationError(
-                "Turso rejected the database URL or request configuration."
-            )
+        for attempt, delay in enumerate(retry_delays):
+            if delay:
+                time.sleep(delay)
+            try:
+                with httpx.Client(
+                    timeout=self.timeout_seconds,
+                    transport=self.transport,
+                ) as client:
+                    response = client.post(
+                        f"{self.base_url}/v3/pipeline",
+                        headers=headers,
+                        json=payload,
+                    )
+            except httpx.RequestError as exc:
+                last_error = exc
+                if attempt < len(retry_delays) - 1:
+                    continue
+                raise DatabaseUnavailableError("Turso could not be reached.") from exc
+
+            if response.status_code in (401, 403):
+                raise DatabaseConfigurationError(
+                    "Turso rejected the configured database credentials."
+                )
+            if response.status_code in (429, 500, 502, 503, 504):
+                if attempt < len(retry_delays) - 1:
+                    continue
+                raise DatabaseUnavailableError("Turso is temporarily unavailable.")
+            if not response.is_success:
+                raise DatabaseConfigurationError(
+                    "Turso rejected the database URL or request configuration."
+                )
+            break
+
+        if response is None:
+            raise DatabaseUnavailableError("Turso could not be reached.") from last_error
 
         try:
             data = response.json()
