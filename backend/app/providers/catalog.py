@@ -25,10 +25,23 @@ PROVIDERS: dict[str, dict[str, str | None]] = {
         "description": "Optional AI cleanup, relevance filtering and structured extraction.",
         "default_model": "gpt-5.6-luna",
     },
+    "prospeo": {
+        "category": "enrichment",
+        "label": "Prospeo",
+        "description": "Find decision-makers and verified work emails when public research is incomplete.",
+        "default_model": None,
+    },
+    "apollo": {
+        "category": "enrichment",
+        "label": "Apollo",
+        "description": "Find owners, founders and other decision-makers, with optional contact enrichment.",
+        "default_model": None,
+    },
 }
 
 SEARCH_PROVIDERS = ("serper", "brave")
 AI_PROVIDERS = ("gemini", "openai")
+ENRICHMENT_PROVIDERS = ("prospeo", "apollo")
 
 
 def provider_meta(provider: str) -> dict[str, str | None]:

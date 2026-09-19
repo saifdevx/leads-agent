@@ -170,7 +170,7 @@ export function getApiUrl() {
 
 export type ProviderConnection = {
   provider: string
-  category: 'search' | 'ai'
+  category: 'search' | 'ai' | 'enrichment'
   label: string
   description: string
   status: string
@@ -204,6 +204,13 @@ export type JobStatus = {
     search_calls?: number
     websites_checked?: number
     errors?: string[]
+    requested_count?: number
+    processed_count?: number
+    enriched_count?: number
+    verified_email_count?: number
+    skipped_count?: number
+    failed_count?: number
+    provider_counts?: Record<string, number>
   }
   last_error: string | null
   created_at: string
@@ -252,4 +259,52 @@ export async function startAutomatedSearch(
 
 export async function getJob(idToken: string, jobId: string): Promise<JobStatus> {
   return authRequest<JobStatus>(`/api/v1/jobs/${encodeURIComponent(jobId)}`, idToken)
+}
+
+
+export type EnrichmentStart = {
+  job_id: string
+  status: string
+  selected_count: number
+}
+
+export async function startLeadEnrichment(
+  idToken: string,
+  input: { lead_ids: string[]; provider: 'auto' | 'prospeo' | 'apollo'; target_titles: string[] },
+): Promise<EnrichmentStart> {
+  return authRequest<EnrichmentStart>('/api/v1/leads/enrich', idToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function downloadLeadExport(
+  idToken: string,
+  input: {
+    format: 'xlsx' | 'csv'
+    list_id?: string
+    lead_ids?: string[]
+    search?: string
+    email_filter?: 'all' | 'verified' | 'has_email' | 'missing_email'
+    min_score?: number
+  },
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch(`${API_URL}/api/v1/leads/export`, {
+    method: 'POST',
+    headers: {
+      Accept: input.format === 'csv' ? 'text/csv' : 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      Authorization: `Bearer ${idToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(input),
+  })
+  if (!response.ok) {
+    throw await readError(response, `Export failed with status ${response.status}`)
+  }
+  const disposition = response.headers.get('content-disposition') || ''
+  const match = disposition.match(/filename=\"?([^\";]+)\"?/i)
+  return {
+    blob: await response.blob(),
+    filename: match?.[1] || `leads.${input.format}`,
+  }
 }

@@ -1,39 +1,88 @@
-# Lead Platform — Discovery Quality & Reliability Update
+# Lead Platform — Enrichment + Better Exports
 
-This update improves the existing automated discovery build rather than adding another major feature. The goal is to make the current **Niche + Location + Lead target → Find Leads** workflow more accurate and resilient before spending credits on Prospeo/Apollo enrichment.
+This build combines multiple next steps so the product reaches an outreach-ready lead workflow faster.
 
-## Important security action first
+## What this update adds
 
-A Gemini API key appeared in earlier local HTTP logs. Treat that key as exposed.
+### 1. Prospeo BYOK
+Users can connect a Prospeo API key from **Settings**. The backend validates the key, encrypts it, and never returns it in plaintext.
 
-Before using Gemini again:
+Prospeo is used for:
+- decision-maker discovery when a company/domain is known,
+- verified work-email enrichment,
+- person/job-title/company enrichment.
 
-1. Revoke/regenerate the old Gemini key in Google AI Studio / Google Cloud.
-2. Do not paste the replacement key into chat or source files.
-3. After installing this update, use **Settings → Gemini → Replace key**.
+Phone/mobile enrichment is intentionally disabled because it is much more expensive than email enrichment.
 
-This build sends the Gemini key through the `x-goog-api-key` header and suppresses third-party HTTP request INFO logs so provider keys are not printed in URLs.
+### 2. Apollo BYOK
+Users can connect an Apollo API key from **Settings**.
 
-## What changed
+Apollo is used for:
+- owner/founder/CEO/decision-maker discovery by company domain,
+- person enrichment,
+- email enrichment when available under the user's Apollo plan.
 
-- Better relevance/location filtering.
-- False social IDs and dates are no longer accepted as phone numbers.
-- Obvious template/demo/directory/job/course results are filtered out.
-- Website metadata/JSON-LD improves business names.
-- Duplicate businesses merge contact data rather than creating duplicate rows.
-- Gemini validation now performs an actual generation request.
-- Gemini default model for new connections is `gemini-3.5-flash-lite`.
-- OpenAI validation also checks the generation path used by discovery.
-- Smart AI mode tries Gemini, then OpenAI when both are connected, then deterministic extraction.
-- Temporary Turso failures retry automatically.
-- Temporary job-status 503 responses no longer stop frontend polling.
-- Search and crawl budgets adapt to low-yield runs while staying bounded.
+### 3. Smart enrichment waterfall
+From **My Leads**, select up to 100 leads and click **Enrich**.
 
-No database migration and no new package are required.
+Default Smart mode:
+
+```text
+Prospeo
+  ↓ if no usable contact
+Apollo
+  ↓
+merge better contact data into the existing lead
+```
+
+The enrichment job prioritizes:
+- owner/founder/CEO/President/Managing Director,
+- verified work email,
+- full contact name,
+- job title,
+- LinkedIn URL,
+- location details.
+
+Existing verified leads are skipped so credits are not wasted.
+
+### 4. Better My Leads workspace
+My Leads now includes:
+- row selection,
+- select all visible,
+- contact name + role,
+- score badges,
+- email verification badges,
+- email-state filter,
+- minimum-score filter,
+- visible-lead stats,
+- bulk enrichment.
+
+### 5. Better exports
+Exports can now be generated as:
+- **Excel (.xlsx)**
+- **CSV (.csv)**
+
+Export either:
+- currently filtered leads, or
+- selected leads.
+
+Excel exports contain:
+- a formatted `Leads` worksheet,
+- a `Summary` worksheet,
+- frozen header row,
+- filters,
+- readable column widths,
+- clickable URLs,
+- verified-email highlighting,
+- score conditional formatting.
+
+The export includes company/contact/email/phone/social/source/score/list fields so it is ready for CRM or outreach workflows.
 
 ## Updating the existing project
 
-Copy this package over the existing repository and allow source files to be replaced.
+First push your current working code to GitHub.
+
+Then copy this package over your existing repository and allow source files to be replaced.
 
 Keep these local/private items:
 
@@ -46,19 +95,25 @@ frontend/package-lock.json
 frontend/node_modules/
 ```
 
-Do not replace or commit real `.env` files.
+Do not regenerate `CREDENTIAL_ENCRYPTION_KEY`.
 
-## Backend environment
+## Backend dependency update
 
-Keep all current Firebase, Turso and credential-encryption values.
+This build adds:
 
-Recommended change in `backend/.env`:
-
-```env
-TURSO_TIMEOUT_SECONDS=15
+```text
+XlsxWriter==3.2.9
 ```
 
-Do **not** regenerate `CREDENTIAL_ENCRYPTION_KEY`.
+Install backend requirements again:
+
+```powershell
+cd D:\Leads-Agent\leads-agent\backend
+.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+No database migration is required.
 
 ## Frontend checks
 
@@ -82,61 +137,94 @@ python -m app.db.migrate
 uvicorn app.main:app --reload --port 8000
 ```
 
-Expected migration result:
+Expected migration output:
 
 ```text
 Database schema is already up to date.
 ```
 
-## Reconnect Gemini
-
-After rotating the leaked key:
+## Connect Prospeo
 
 1. Open **Settings**.
-2. Choose **Gemini → Replace key**.
-3. Leave the suggested model `gemini-3.5-flash-lite` unless you intentionally want another compatible model.
-4. Connect.
+2. Find **Prospeo**.
+3. Click **Connect**.
+4. Paste your Prospeo API key.
+5. The backend validates the key using Prospeo account information before storing it.
 
-The backend now tests a real `generateContent` request before accepting the key. A key that can list models but cannot generate will no longer appear healthy.
+## Connect Apollo
 
-If Gemini still cannot generate, leave AI cleanup on **Automatic** if OpenAI is connected, or switch AI cleanup **Off** temporarily. Search and deterministic extraction still work.
+1. Open **Settings**.
+2. Find **Apollo**.
+3. Click **Connect**.
+4. Paste an Apollo API key with access to the people-search/person-enrichment endpoints you want to use.
+5. The backend validates the key with Apollo's auth-health endpoint.
 
-## Recommended repeat test
+Apollo plan/API scopes can vary. A valid API key can still receive a provider-level error later if that Apollo plan or scoped key does not include a particular people endpoint.
 
-Use the same benchmark as the previous run:
+## Recommended test
+
+Use an existing discovery list such as:
 
 ```text
-Business / niche: Pressure washing
-Location: Texas, USA
-Leads wanted: 25
-Search source: Smart / automatic
-AI cleanup: Automatic
-Check company websites: On
+Pressure washing — Texas, USA
 ```
 
-Review the resulting list for:
+Then:
 
-- actual Texas relevance,
-- real company names,
-- plausible phone numbers,
-- email count,
-- duplicate businesses,
-- demo/template sites,
-- total search calls and runtime.
+1. Open **My Leads**.
+2. Filter to `Missing email` or `Unverified email` leads.
+3. Select 5–10 leads with real business domains.
+4. Click **Enrich**.
+5. Leave provider on **Smart — Prospeo then Apollo**.
+6. Leave target roles as:
 
-Examples that should now be filtered/fixed:
+```text
+Owner, Founder, CEO, President, Managing Director
+```
 
-- `2024-05-15` must not become a phone number.
-- long Facebook numeric IDs must not become phone numbers.
-- an explicit `Central Florida` result should not be saved for a Texas search.
-- `themereserve.com` demo/template results should not count as leads.
-- two rows from the same business domain should merge contact data into one business.
+7. Start enrichment.
+8. Wait for the completion notice.
+9. Refresh the list and check:
+   - decision-maker names,
+   - job titles,
+   - verified email badges,
+   - LinkedIn URLs,
+   - source now including `prospeo` and/or `apollo`.
 
-## Next step after this quality test
+Then test exports:
 
-Do not add outreach yet. If this benchmark is materially cleaner, the next provider layer should be:
+1. Filter to `Verified email`.
+2. Choose `Excel (.xlsx)`.
+3. Click **Export view**.
+4. Open the workbook and verify both `Leads` and `Summary` worksheets.
+5. Repeat with CSV.
 
-1. **Prospeo** — verify/fill missing emails.
-2. **Apollo** — identify owners/founders/decision makers where needed.
+## Cost-control behavior
 
-Paid enrichment should be applied only after free/public discovery and deduplication, so credits are spent on good candidate businesses rather than noisy search results.
+The app deliberately does not enrich mobile/phone data through Prospeo/Apollo in this build.
+
+The intended order remains:
+
+```text
+Serper / Brave discovery
+→ public website crawl
+→ AI cleanup
+→ dedupe
+→ Prospeo/Apollo only for the good candidates
+```
+
+That prevents paid credits from being spent on noisy search results.
+
+## Next combined step after this passes
+
+Once enrichment + exports are stable, the fastest path to a complete usable MVP is to combine:
+
+- email templates,
+- Gmail OAuth sender connection,
+- campaign creation,
+- queue + daily limits,
+- preview/approval before send,
+- unsubscribe/suppression safety,
+- basic campaign status.
+
+Advanced follow-ups/reply classification can follow after the first safe outbound flow works.

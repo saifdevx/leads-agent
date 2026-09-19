@@ -6,7 +6,7 @@ type Props = { getToken: () => Promise<string> }
 
 type Draft = { provider: ProviderConnection; apiKey: string; model: string }
 
-const providerOrder = ['serper', 'brave', 'gemini', 'openai']
+const providerOrder = ['serper', 'brave', 'gemini', 'openai', 'prospeo', 'apollo']
 
 export function SettingsPage({ getToken }: Props) {
   const [providers, setProviders] = useState<ProviderConnection[]>([])
@@ -90,7 +90,7 @@ export function SettingsPage({ getToken }: Props) {
                   <div className="flex items-center gap-2">
                     <h3 className="font-display text-lg font-bold text-[#24262D]">{provider.label}</h3>
                     <span className={`rounded-md px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${provider.connected ? 'bg-[#F0F8DC] text-[#688328]' : 'bg-[#F2F1F6] text-[#777A87]'}`}>
-                      {provider.connected ? 'Connected' : provider.category === 'ai' ? 'Optional AI' : 'Search'}
+                      {provider.connected ? 'Connected' : provider.category === 'ai' ? 'Optional AI' : provider.category === 'enrichment' ? 'Enrichment' : 'Search'}
                     </span>
                   </div>
                   <p className="mt-2 max-w-[520px] text-sm leading-6 text-[#6F727E]">{provider.description}</p>
@@ -102,7 +102,7 @@ export function SettingsPage({ getToken }: Props) {
                   {provider.connected ? (
                     <span>{provider.key_hint}{provider.model ? ` · ${provider.model}` : ''}</span>
                   ) : (
-                    <span>{provider.provider === 'serper' ? 'Best match for Google-style prospecting.' : provider.provider === 'brave' ? 'Useful secondary web coverage.' : 'Improves cleanup and relevance filtering.'}</span>
+                    <span>{provider.provider === 'serper' ? 'Best match for Google-style prospecting.' : provider.provider === 'brave' ? 'Useful secondary web coverage.' : provider.provider === 'prospeo' ? 'Verified-email enrichment. Credits are only used when you choose to enrich.' : provider.provider === 'apollo' ? 'Decision-maker discovery and contact enrichment. Credits depend on your Apollo plan.' : 'Improves cleanup and relevance filtering.'}</span>
                   )}
                 </div>
                 <div className="flex gap-2">

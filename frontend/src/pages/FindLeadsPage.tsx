@@ -4,9 +4,11 @@ import {
   ApiRequestError,
   createSearchPlan,
   getJob,
+  getLeads,
   getProviders,
   importLeadText,
   startAutomatedSearch,
+  startLeadEnrichment,
   type ImportResult,
   type JobStatus,
   type ProviderConnection,
@@ -30,10 +32,15 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
   const [searchProvider, setSearchProvider] = useState<'auto' | 'serper' | 'brave'>('auto')
   const [aiProvider, setAiProvider] = useState<'auto' | 'none' | 'gemini' | 'openai'>('auto')
   const [crawlWebsites, setCrawlWebsites] = useState(true)
+  const [autoEnrich, setAutoEnrich] = useState(false)
   const [providers, setProviders] = useState<ProviderConnection[]>([])
   const [job, setJob] = useState<JobStatus | null>(null)
   const [jobId, setJobId] = useState<string | null>(null)
+  const [enrichmentJob, setEnrichmentJob] = useState<JobStatus | null>(null)
+  const [enrichmentJobId, setEnrichmentJobId] = useState<string | null>(null)
   const pollTimer = useRef<number | null>(null)
+  const enrichmentPollTimer = useRef<number | null>(null)
+  const autoEnrichStarted = useRef(false)
 
   const [plan, setPlan] = useState<SearchPlan | null>(null)
   const [selectedQuery, setSelectedQuery] = useState('')
@@ -55,6 +62,26 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
 
   useEffect(() => { void refreshProviders() }, [])
 
+  async function maybeStartAutoEnrichment(token: string, listId: string | undefined) {
+    if (!autoEnrich || !listId || autoEnrichStarted.current) return false
+    const enrichmentConnected = providers.some((item) => item.category === 'enrichment' && item.connected)
+    if (!enrichmentConnected) return false
+    autoEnrichStarted.current = true
+    const listLeads = await getLeads(token, listId)
+    const leadIds = listLeads
+      .filter((lead) => !(lead.email && (lead.email_status || '').toLowerCase() === 'verified' && lead.first_name))
+      .map((lead) => lead.id)
+      .slice(0, 500)
+    if (!leadIds.length) return false
+    const next = await startLeadEnrichment(token, {
+      lead_ids: leadIds,
+      provider: 'auto',
+      target_titles: ['Owner', 'Founder', 'CEO', 'President', 'Managing Director'],
+    })
+    setEnrichmentJobId(next.job_id)
+    return true
+  }
+
   useEffect(() => {
     if (!jobId) return
     let cancelled = false
@@ -66,7 +93,12 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
         if (cancelled) return
         setPollWarning(null)
         setJob(next)
-        if (next.status === 'complete' || next.status === 'failed') {
+        if (next.status === 'complete') {
+          const enrichmentStarted = await maybeStartAutoEnrichment(token, next.result.list_id)
+          if (!enrichmentStarted) setBusy(null)
+          return
+        }
+        if (next.status === 'failed') {
           setBusy(null)
           return
         }
@@ -90,8 +122,49 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
     }
   }, [jobId, getToken])
 
+  useEffect(() => {
+    if (!enrichmentJobId) return
+    let cancelled = false
+
+    async function pollEnrichment() {
+      try {
+        const token = await getToken()
+        const next = await getJob(token, enrichmentJobId as string)
+        if (cancelled) return
+        setEnrichmentJob(next)
+        setPollWarning(null)
+        if (next.status === 'complete') {
+          setBusy(null)
+          return
+        }
+        if (next.status === 'failed') {
+          setError(next.last_error || 'Automatic enrichment failed. Discovery results are still saved.')
+          setBusy(null)
+          return
+        }
+        enrichmentPollTimer.current = window.setTimeout(() => void pollEnrichment(), 4000)
+      } catch (nextError) {
+        if (cancelled) return
+        if (nextError instanceof ApiRequestError && nextError.status === 503) {
+          setPollWarning('Temporary connection hiccup — enrichment is still running. Retrying automatically…')
+          enrichmentPollTimer.current = window.setTimeout(() => void pollEnrichment(), 5000)
+          return
+        }
+        setError(nextError instanceof ApiRequestError ? nextError.message : 'Could not read enrichment progress.')
+        setBusy(null)
+      }
+    }
+
+    void pollEnrichment()
+    return () => {
+      cancelled = true
+      if (enrichmentPollTimer.current) window.clearTimeout(enrichmentPollTimer.current)
+    }
+  }, [enrichmentJobId, getToken])
+
   const connectedSearch = useMemo(() => providers.filter((item) => item.category === 'search' && item.connected), [providers])
   const connectedAi = useMemo(() => providers.filter((item) => item.category === 'ai' && item.connected), [providers])
+  const connectedEnrichment = useMemo(() => providers.filter((item) => item.category === 'enrichment' && item.connected), [providers])
   const automaticReady = connectedSearch.length > 0
 
   async function startSearch() {
@@ -99,6 +172,9 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
     setError(null)
     setPollWarning(null)
     setJob(null)
+    setEnrichmentJob(null)
+    setEnrichmentJobId(null)
+    autoEnrichStarted.current = false
     try {
       const token = await getToken()
       const next = await startAutomatedSearch(token, {
@@ -193,7 +269,7 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
         </button>
 
         {advanced && (
-          <div className="mt-2 grid gap-4 rounded-[12px] border border-[#E5E3EF] bg-[#FAF9FF] p-4 sm:grid-cols-3 sm:p-5">
+          <div className="mt-2 grid gap-4 rounded-[12px] border border-[#E5E3EF] bg-[#FAF9FF] p-4 sm:grid-cols-2 lg:grid-cols-4 sm:p-5">
             <label>
               <span className="mb-2 block text-xs font-bold text-[#51545F]">Search source</span>
               <select value={searchProvider} onChange={(event) => setSearchProvider(event.target.value as typeof searchProvider)} className="focus-ring h-10 w-full rounded-[8px] border border-[#DCDDE5] bg-white px-3 text-sm">
@@ -214,6 +290,10 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
             <label className="flex items-end gap-3 pb-2">
               <input type="checkbox" checked={crawlWebsites} onChange={(event) => setCrawlWebsites(event.target.checked)} className="h-4 w-4 accent-[#7B61FF]" />
               <span className="text-sm font-semibold text-[#51545F]">Check company websites</span>
+            </label>
+            <label className={`flex items-end gap-3 pb-2 ${connectedEnrichment.length ? '' : 'opacity-55'}`}>
+              <input type="checkbox" disabled={!connectedEnrichment.length} checked={autoEnrich && connectedEnrichment.length > 0} onChange={(event) => setAutoEnrich(event.target.checked)} className="h-4 w-4 accent-[#7B61FF]" />
+              <span className="text-sm font-semibold text-[#51545F]">Auto-enrich contacts <span className="block text-[10px] font-medium text-[#8A8D97]">Uses Prospeo/Apollo credits</span></span>
             </label>
           </div>
         )}
@@ -242,7 +322,21 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#E9E7F1]"><div className="h-full rounded-full bg-[#7B61FF] transition-all" style={{ width: `${Math.max(2, Math.min(100, percent))}%` }} /></div>
             {job.result.errors && job.result.errors.length > 0 && <p className="mt-3 text-xs leading-5 text-[#8A6C41]">Some sources had issues, but the search continued where possible.</p>}
             {pollWarning && <p className="mt-3 rounded-[8px] bg-[#FFF8E8] px-3 py-2 text-xs font-medium leading-5 text-[#82631F]">{pollWarning}</p>}
-            {job.status === 'complete' && <button type="button" onClick={onViewLeads} className="focus-ring mt-4 inline-flex h-10 items-center gap-2 rounded-[9px] bg-[#7B61FF] px-4 text-sm font-bold text-white">View My Leads <Icon name="arrow" className="h-4 w-4" /></button>}
+            {job.status === 'complete' && !enrichmentJobId && <button type="button" onClick={onViewLeads} className="focus-ring mt-4 inline-flex h-10 items-center gap-2 rounded-[9px] bg-[#7B61FF] px-4 text-sm font-bold text-white">View My Leads <Icon name="arrow" className="h-4 w-4" /></button>}
+          </div>
+        )}
+
+        {enrichmentJob && (
+          <div className="mt-4 rounded-[13px] border border-[#E1E8C8] bg-[#FBFDF5] p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <div className="text-sm font-bold text-[#2D3038]">{enrichmentJob.status === 'complete' ? 'Contact enrichment complete' : enrichmentJob.result.current_step || 'Enriching contacts'}</div>
+                <div className="mt-1 text-xs text-[#747784]">{enrichmentJob.result.processed_count || 0} / {enrichmentJob.result.requested_count || 0} processed · {enrichmentJob.result.verified_email_count || 0} verified emails</div>
+              </div>
+              <span className={`rounded-md px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] ${enrichmentJob.status === 'complete' ? 'bg-[#EEF7D6] text-[#617D1C]' : enrichmentJob.status === 'failed' ? 'bg-[#FFF0EE] text-[#A34840]' : 'bg-[#F0EDFF] text-[#6D52EE]'}`}>{enrichmentJob.status}</span>
+            </div>
+            <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#E8ECD9]"><div className="h-full rounded-full bg-[#BCE953] transition-all" style={{ width: `${Math.max(2, Math.min(100, enrichmentJob.result.progress_percent || 0))}%` }} /></div>
+            {enrichmentJob.status === 'complete' && <button type="button" onClick={onViewLeads} className="focus-ring mt-4 inline-flex h-10 items-center gap-2 rounded-[9px] bg-[#7B61FF] px-4 text-sm font-bold text-white">View enriched leads <Icon name="arrow" className="h-4 w-4" /></button>}
           </div>
         )}
 
@@ -260,7 +354,7 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
         <section className="grid gap-4 md:grid-cols-3">
           <div className="card-surface rounded-[12px] p-4"><div className="text-xs font-bold uppercase tracking-[0.07em] text-[#8A8D97]">Search</div><div className="mt-2 text-sm font-bold text-[#31343C]">{connectedSearch.length ? connectedSearch.map((item) => item.label).join(' + ') : 'No source connected'}</div></div>
           <div className="card-surface rounded-[12px] p-4"><div className="text-xs font-bold uppercase tracking-[0.07em] text-[#8A8D97]">AI cleanup</div><div className="mt-2 text-sm font-bold text-[#31343C]">{connectedAi.length ? connectedAi.map((item) => item.label).join(' / ') : 'Optional — deterministic fallback'}</div></div>
-          <div className="card-surface rounded-[12px] p-4"><div className="text-xs font-bold uppercase tracking-[0.07em] text-[#8A8D97]">Enrichment</div><div className="mt-2 text-sm font-bold text-[#31343C]">Public websites first</div></div>
+          <div className="card-surface rounded-[12px] p-4"><div className="text-xs font-bold uppercase tracking-[0.07em] text-[#8A8D97]">Enrichment</div><div className="mt-2 text-sm font-bold text-[#31343C]">{connectedEnrichment.length ? connectedEnrichment.map((item) => item.label).join(' / ') : 'Public websites first'}</div></div>
         </section>
       )}
 

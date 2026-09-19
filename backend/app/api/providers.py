@@ -6,6 +6,7 @@ from app.auth.dependencies import get_current_user
 from app.auth.schemas import AuthenticatedUser
 from app.providers.ai import validate_ai_provider
 from app.providers.catalog import PROVIDERS
+from app.providers.enrichment import validate_enrichment_provider
 from app.providers.dependencies import get_provider_repository
 from app.providers.repository import ProviderRepository
 from app.providers.schemas import ProviderConnectionRequest, ProviderConnectionResponse, ProviderDeleteResponse
@@ -37,8 +38,10 @@ def connect_provider(
     try:
         if meta["category"] == "search":
             validate_search_provider(provider, request.api_key)
-        else:
+        elif meta["category"] == "ai":
             validate_ai_provider(provider, request.api_key, model)
+        else:
+            validate_enrichment_provider(provider, request.api_key)
     except ProviderRequestError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 

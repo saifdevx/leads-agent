@@ -1,48 +1,55 @@
-# Test Checklist — Discovery Quality & Reliability
-
-## Before testing
-- [ ] Previous working build is pushed to Git.
-- [ ] Real `.env` files were preserved.
-- [ ] `CREDENTIAL_ENCRYPTION_KEY` was NOT regenerated.
-- [ ] Previously exposed Gemini key was revoked/rotated.
-- [ ] `TURSO_TIMEOUT_SECONDS=15` is recommended locally.
-
-## Frontend
-- [ ] `npm install --include=optional`
-- [ ] `npm run check`
-- [ ] `npm run test`
-- [ ] `npm run build`
-- [ ] `npm run dev`
-
-## Backend
-- [ ] `pip install -r requirements.txt`
-- [ ] `pytest -q`
-- [ ] `python -m app.db.migrate` reports already up to date
-- [ ] backend starts on port 8000
-
-## Providers
-- [ ] Serper remains connected.
-- [ ] New Gemini key can be connected.
-- [ ] Invalid Gemini generation access is rejected during connection.
-- [ ] Provider API keys do not appear in backend request logs.
-
-## Automated quality benchmark
-Search: Pressure washing / Texas, USA / 25 leads.
-
-- [ ] search starts automatically
-- [ ] temporary Turso/job-polling failures retry rather than stop the UI
-- [ ] no obvious Facebook IDs as phone numbers
-- [ ] no date-like phone values
-- [ ] explicit out-of-state result such as Central Florida is rejected
-- [ ] template/demo sites are rejected
-- [ ] duplicate company domains merge into one record
-- [ ] company names are better than generic page titles where website metadata exists
-- [ ] website crawler failures do not stop the run
-- [ ] job completes or reaches bounded search budget cleanly
+# Test Checklist
 
 ## Regression
-- [ ] Login/logout still work.
-- [ ] My Leads still loads.
-- [ ] Manual fallback still works.
-- [ ] Export still works.
-- [ ] Settings connect/disconnect still work.
+
+### Frontend
+```powershell
+npm run check
+npm run test
+npm run build
+```
+
+### Backend
+```powershell
+pytest -q
+python -m app.db.migrate
+```
+
+Migration should report that the schema is already up to date.
+
+## Provider settings
+
+- [ ] Existing Serper connection still loads.
+- [ ] Existing Gemini/OpenAI connection still loads.
+- [ ] Prospeo appears in Settings.
+- [ ] Apollo appears in Settings.
+- [ ] Invalid Prospeo key is rejected.
+- [ ] Valid Prospeo key is accepted.
+- [ ] Invalid Apollo key is rejected.
+- [ ] Valid Apollo key is accepted.
+- [ ] Saved provider key is masked after refresh.
+
+## Lead enrichment
+
+- [ ] Select 5–10 leads.
+- [ ] Enrich button enables.
+- [ ] Smart provider mode starts a background job.
+- [ ] Job polling survives temporary database 503 responses.
+- [ ] Already-verified lead is not charged/enriched again.
+- [ ] Missing contact can receive name/title/email/LinkedIn when provider finds a match.
+- [ ] Verified email status displays as Verified.
+- [ ] Existing business row is updated; no duplicate lead row is created.
+- [ ] Enrichment source is appended to existing source.
+- [ ] More than 100 selected leads cannot be enriched in one run.
+
+## Export
+
+- [ ] Export current filtered view to XLSX.
+- [ ] Workbook contains `Leads` and `Summary` sheets.
+- [ ] XLSX hyperlinks open correctly.
+- [ ] Verified email status is visibly highlighted.
+- [ ] Export current filtered view to CSV.
+- [ ] Select several rows and export selected only.
+- [ ] Email-status filter is reflected in filtered export.
+- [ ] Minimum-score filter is reflected in filtered export.
+- [ ] Empty export produces a clear error instead of a blank file.

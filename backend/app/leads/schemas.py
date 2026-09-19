@@ -77,3 +77,27 @@ class AutomatedLeadSearchResponse(BaseModel):
     lead_list: LeadListResponse
     job_id: str
     status: str
+
+
+class LeadEnrichmentRequest(BaseModel):
+    lead_ids: list[str] = Field(min_length=1, max_length=500)
+    provider: str = Field(default="auto", pattern="^(auto|prospeo|apollo)$")
+    target_titles: list[str] = Field(
+        default_factory=lambda: ["Owner", "Founder", "CEO", "President", "Managing Director"],
+        max_length=20,
+    )
+
+
+class LeadEnrichmentResponse(BaseModel):
+    job_id: str
+    status: str
+    selected_count: int
+
+
+class LeadExportRequest(BaseModel):
+    format: str = Field(default="xlsx", pattern="^(xlsx|csv)$")
+    list_id: str | None = None
+    lead_ids: list[str] = Field(default_factory=list, max_length=1000)
+    search: str | None = Field(default=None, max_length=200)
+    email_filter: str = Field(default="all", pattern="^(all|verified|has_email|missing_email)$")
+    min_score: float | None = Field(default=None, ge=0, le=100)

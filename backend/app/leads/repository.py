@@ -185,6 +185,94 @@ class LeadRepository:
             )
         return result.rows
 
+    def get_leads_by_ids(self, user_id: str, lead_ids: list[str]) -> list[dict]:
+        clean_ids = list(dict.fromkeys(lead_id for lead_id in lead_ids if lead_id))[:500]
+        if not clean_ids:
+            return []
+        placeholders = ",".join("?" for _ in clean_ids)
+        result = self.database.execute(
+            f"""
+            SELECT id, list_id, company_name, website, domain, first_name, last_name,
+                   job_title, email, email_status, phone, linkedin_url, instagram_url,
+                   facebook_url, city, region, country, source, source_url, source_query,
+                   score, status, created_at, updated_at
+            FROM leads
+            WHERE user_id = ? AND id IN ({placeholders})
+            ORDER BY created_at DESC
+            """,
+            (user_id, *clean_ids),
+        )
+        return result.rows
+
+    def update_enriched_lead(
+        self,
+        user_id: str,
+        lead_id: str,
+        updates: dict,
+        provider: str,
+        *,
+        current_row: dict | None = None,
+    ) -> dict | None:
+        current = current_row
+        if current is None:
+            current_rows = self.get_leads_by_ids(user_id, [lead_id])
+            if not current_rows:
+                return None
+            current = current_rows[0]
+
+        def choose(field: str):
+            incoming = updates.get(field)
+            if field == "company_name":
+                return _better_name(current.get(field), incoming)
+            if field == "email":
+                current_status = str(current.get("email_status") or "").lower()
+                incoming_status = str(updates.get("email_status") or "").lower()
+                if incoming and (not current.get("email") or incoming_status == "verified" or current_status != "verified"):
+                    return incoming
+                return current.get("email")
+            if field == "email_status":
+                current_status = str(current.get(field) or "").lower()
+                incoming_status = str(incoming or "").lower()
+                if incoming_status == "verified" or not current_status:
+                    return incoming_status or current.get(field)
+                return current.get(field)
+            return current.get(field) or incoming
+
+        source_parts = [part for part in str(current.get("source") or "").split("+") if part]
+        if provider and provider not in source_parts:
+            source_parts.append(provider)
+        source = "+".join(source_parts) or provider or current.get("source")
+        score = max(float(current.get("score") or 0.0), float(updates.get("score") or 0.0)) or None
+        status = "ready" if (choose("email") and choose("email_status") == "verified") else ("enriched" if updates else current.get("status"))
+        now = _now()
+        self.database.execute(
+            """
+            UPDATE leads SET company_name = ?, website = ?, domain = ?, first_name = ?, last_name = ?,
+                job_title = ?, email = ?, email_status = ?, phone = ?, linkedin_url = ?, instagram_url = ?,
+                facebook_url = ?, city = ?, region = ?, country = ?, source = ?, score = ?, status = ?, updated_at = ?
+            WHERE id = ? AND user_id = ?
+            """,
+            (
+                choose("company_name"), choose("website"), choose("domain"), choose("first_name"),
+                choose("last_name"), choose("job_title"), choose("email"), choose("email_status"),
+                choose("phone"), choose("linkedin_url"), choose("instagram_url"), choose("facebook_url"),
+                choose("city"), choose("region"), choose("country"), source, score, status, now, lead_id, user_id,
+            ),
+            want_rows=False,
+        )
+        return {
+            **current,
+            **{key: choose(key) for key in (
+                "company_name", "website", "domain", "first_name", "last_name", "job_title",
+                "email", "email_status", "phone", "linkedin_url", "instagram_url", "facebook_url",
+                "city", "region", "country",
+            )},
+            "source": source,
+            "score": score,
+            "status": status,
+            "updated_at": now,
+        }
+
     def import_parsed_leads(self, user_id: str, list_id: str, leads: list[ParsedLead]) -> tuple[list[dict], int, int]:
         lead_list = self.get_lead_list(user_id, list_id)
         existing_rows = self.database.execute(
