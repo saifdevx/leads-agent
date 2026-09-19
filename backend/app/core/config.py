@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Lead Platform API"
-    app_version: str = "0.4.0"
+    app_version: str = "0.5.0"
     app_env: str = "development"
     cors_origins: str = "http://localhost:5173"
     log_level: str = "INFO"
@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     turso_database_url: str = ""
     turso_auth_token: str = ""
     turso_timeout_seconds: float = 10.0
+    credential_encryption_key: str = ""
 
     model_config = SettingsConfigDict(
         env_file=".env",

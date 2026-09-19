@@ -52,6 +52,20 @@ class LeadRepository:
             raise LeadListNotFoundError(list_id)
         return result.rows[0]
 
+    def set_lead_list_status(self, user_id: str, list_id: str, status: str) -> None:
+        self.database.execute(
+            "UPDATE lead_lists SET status = ?, updated_at = ? WHERE id = ? AND user_id = ?",
+            (status, _now(), list_id, user_id),
+            want_rows=False,
+        )
+
+    def count_leads(self, user_id: str, list_id: str) -> int:
+        result = self.database.execute(
+            "SELECT COUNT(*) AS count FROM leads WHERE user_id = ? AND list_id = ?",
+            (user_id, list_id),
+        )
+        return int(result.rows[0].get("count") or 0) if result.rows else 0
+
     def list_lead_lists(self, user_id: str) -> list[dict]:
         result = self.database.execute(
             """
@@ -135,41 +149,51 @@ class LeadRepository:
             unique.append(lead)
 
         now = _now()
+        inserted_ids: list[str] = []
+        statements: list[tuple[str, tuple, bool]] = []
         for lead in unique:
-            self.database.execute(
+            lead_id = str(uuid4())
+            inserted_ids.append(lead_id)
+            statements.append((
                 """
                 INSERT INTO leads (
-                    id, user_id, list_id, company_name, website, domain, email, email_status,
-                    phone, linkedin_url, instagram_url, facebook_url, region, source,
-                    source_url, source_query, status, created_at, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'discovered', ?, ?)
+                    id, user_id, list_id, company_name, website, domain, first_name, last_name,
+                    job_title, email, email_status, phone, linkedin_url, instagram_url, facebook_url,
+                    region, source, source_url, source_query, score, status, created_at, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'discovered', ?, ?)
                 """,
                 (
-                    str(uuid4()), user_id, list_id, lead.company_name, lead.website, lead.domain,
-                    lead.email, lead.email_status, lead.phone, lead.linkedin_url, lead.instagram_url,
-                    lead.facebook_url, lead.region or lead_list.get("location"), lead.source,
-                    lead.source_url, lead.source_query, now, now,
+                    lead_id, user_id, list_id, lead.company_name, lead.website, lead.domain,
+                    getattr(lead, "first_name", None), getattr(lead, "last_name", None),
+                    getattr(lead, "job_title", None), lead.email, lead.email_status, lead.phone,
+                    lead.linkedin_url, lead.instagram_url, lead.facebook_url,
+                    lead.region or lead_list.get("location"), lead.source, lead.source_url,
+                    lead.source_query, getattr(lead, "score", None), now, now,
                 ),
-                want_rows=False,
-            )
+                False,
+            ))
 
-        self.database.execute(
+        statements.append((
             "UPDATE lead_lists SET status = 'ready', updated_at = ? WHERE id = ? AND user_id = ?",
             (now, list_id, user_id),
-            want_rows=False,
-        )
+            False,
+        ))
+        self.database.execute_batch(statements)
 
-        # Return only records added by this import, using the timestamp shared by the inserts.
+        if not inserted_ids:
+            return [], duplicate_count, skipped_count
+
+        placeholders = ",".join("?" for _ in inserted_ids)
         added_rows = self.database.execute(
-            """
+            f"""
             SELECT id, list_id, company_name, website, domain, first_name, last_name,
                    job_title, email, email_status, phone, linkedin_url, instagram_url,
                    facebook_url, city, region, country, source, source_url, source_query,
                    score, status, created_at, updated_at
             FROM leads
-            WHERE user_id = ? AND list_id = ? AND created_at = ?
+            WHERE user_id = ? AND list_id = ? AND id IN ({placeholders})
             ORDER BY created_at DESC
             """,
-            (user_id, list_id, now),
+            (user_id, list_id, *inserted_ids),
         ).rows
         return added_rows, duplicate_count, skipped_count

@@ -167,3 +167,89 @@ export async function getLeads(idToken: string, listId?: string): Promise<Lead[]
 export function getApiUrl() {
   return API_URL
 }
+
+export type ProviderConnection = {
+  provider: string
+  category: 'search' | 'ai'
+  label: string
+  description: string
+  status: string
+  connected: boolean
+  model: string | null
+  key_hint: string | null
+  last_validated_at: string | null
+  last_error: string | null
+}
+
+export type AutomatedSearchStart = {
+  lead_list: LeadList
+  job_id: string
+  status: string
+}
+
+export type JobStatus = {
+  id: string
+  job_type: string
+  status: 'pending' | 'running' | 'complete' | 'failed'
+  result: {
+    list_id?: string
+    target_count?: number
+    found_count?: number
+    progress_percent?: number
+    current_step?: string
+    search_provider?: string
+    ai_provider?: string | null
+    queries_completed?: number
+    queries_total?: number
+    search_calls?: number
+    websites_checked?: number
+    errors?: string[]
+  }
+  last_error: string | null
+  created_at: string
+  updated_at: string
+  started_at: string | null
+  completed_at: string | null
+}
+
+export async function getProviders(idToken: string): Promise<ProviderConnection[]> {
+  return authRequest<ProviderConnection[]>('/api/v1/providers', idToken)
+}
+
+export async function connectProvider(
+  idToken: string,
+  provider: string,
+  input: { api_key: string; model?: string },
+): Promise<ProviderConnection> {
+  return authRequest<ProviderConnection>(`/api/v1/providers/${encodeURIComponent(provider)}`, idToken, {
+    method: 'PUT',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function disconnectProvider(idToken: string, provider: string): Promise<{ provider: string; connected: false }> {
+  return authRequest<{ provider: string; connected: false }>(`/api/v1/providers/${encodeURIComponent(provider)}`, idToken, {
+    method: 'DELETE',
+  })
+}
+
+export async function startAutomatedSearch(
+  idToken: string,
+  input: {
+    niche: string
+    location?: string
+    target_count: number
+    search_provider: 'auto' | 'serper' | 'brave'
+    ai_provider: 'auto' | 'none' | 'gemini' | 'openai'
+    crawl_websites: boolean
+  },
+): Promise<AutomatedSearchStart> {
+  return authRequest<AutomatedSearchStart>('/api/v1/lead-lists/automated-search', idToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
+
+export async function getJob(idToken: string, jobId: string): Promise<JobStatus> {
+  return authRequest<JobStatus>(`/api/v1/jobs/${encodeURIComponent(jobId)}`, idToken)
+}

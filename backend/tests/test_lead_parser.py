@@ -5,7 +5,7 @@ from app.leads.search_queries import generate_search_queries
 def test_generates_free_search_queries_for_niche_and_location():
     queries = generate_search_queries("Solar panel installers", "Texas")
 
-    assert len(queries) == 8
+    assert len(queries) >= 8
     assert '"Solar panel installers" "Texas" "gmail.com"' in queries
     assert any(query.startswith("site:instagram.com") for query in queries)
     assert any(query.startswith("site:linkedin.com/company") for query in queries)

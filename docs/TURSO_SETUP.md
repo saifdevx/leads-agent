@@ -1,6 +1,6 @@
-# Turso Setup — Checkpoint 3
+# Turso Setup
 
-Checkpoint 3 adds the application database while keeping Firebase as the authentication provider.
+Turso stores application data while Firebase remains the authentication provider.
 
 ## 1. Create the database
 
@@ -41,7 +41,7 @@ Treat the auth token like a password. Never place it in the frontend or commit i
 Keep the Firebase values you already configured and add:
 
 ```env
-APP_VERSION=0.3.0
+APP_VERSION=<use the value from backend/.env.example>
 
 TURSO_DATABASE_URL=turso://your-database-host.turso.io
 TURSO_AUTH_TOKEN=your-private-token
@@ -97,7 +97,7 @@ The existing `GET /api/v1/auth/me` flow now does two things:
 1. verifies the Firebase ID token;
 2. inserts or updates the corresponding `users` row in Turso.
 
-The frontend response shape is unchanged, so Checkpoint 2's UI remains compatible.
+The frontend response shape remains compatible with the existing authentication UI.
 
 ## 6. Verify the row
 
@@ -115,4 +115,4 @@ Your signed-in Firebase user should appear once. Signing in again updates that s
 - `TURSO_AUTH_TOKEN` is backend-only.
 - The frontend never connects directly to Turso.
 - User ownership will be enforced server-side using the verified Firebase UID.
-- `provider_connections.credentials_ciphertext` is reserved for a later provider-integration checkpoint; plaintext credentials are not stored in this release.
+- `provider_connections.credentials_ciphertext` stores encrypted BYOK credentials; plaintext provider keys must never be persisted.

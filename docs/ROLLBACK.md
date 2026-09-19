@@ -1,14 +1,16 @@
 # Rollback
 
-This change is additive at the application level and does not add a database migration.
+The previous stable code is already preserved in GitHub.
 
-If the free lead finder causes an issue:
+If this automated-discovery update causes a blocking issue:
 
-1. Use Git to restore the last stable commit.
-2. Keep the existing Firebase and Turso credentials unchanged.
-3. Restart backend and frontend.
-4. Run backend/frontend regression tests again.
+1. Stop frontend/backend servers.
+2. Restore the previous commit from Git.
+3. Keep existing `.env` files and Turso data.
+4. Restart the previous backend/frontend.
 
-Leads imported before a code rollback remain in Turso because this release uses the existing `lead_lists` and `leads` tables. A code rollback does not delete user data.
+No database migration is introduced by this update, so rolling back source code does not require a schema rollback.
 
-Do not delete Turso tables as part of a normal rollback.
+The new `CREDENTIAL_ENCRYPTION_KEY` may remain in `.env`; older code simply ignores it.
+
+Do not delete provider connection rows manually unless intentionally removing saved BYOK credentials.

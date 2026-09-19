@@ -1,8 +1,8 @@
-# Delivery Notes — Free Lead Finder
+# Delivery Notes — Automated Lead Discovery
 
 ## Replace
 
-Copy the complete release source over the existing repository.
+Copy the complete package source over the existing repository and allow source files to be replaced.
 
 ## Keep locally
 
@@ -15,38 +15,67 @@ frontend/package-lock.json
 frontend/node_modules/
 ```
 
-## New backend files
+## Important additions
+
+Backend:
+
+```text
+backend/app/providers/
+backend/app/jobs/
+backend/app/leads/crawler.py
+backend/app/leads/discovery.py
+backend/app/api/providers.py
+backend/app/api/jobs.py
+backend/tests/test_provider_security.py
+```
+
+Frontend:
+
+```text
+frontend/src/pages/SettingsPage.tsx
+```
+
+## Important modified areas
 
 ```text
 backend/app/api/leads.py
-backend/app/leads/__init__.py
+backend/app/core/config.py
+backend/app/db/client.py
 backend/app/leads/parser.py
 backend/app/leads/repository.py
-backend/app/leads/schemas.py
 backend/app/leads/search_queries.py
-backend/tests/test_lead_parser.py
-backend/tests/test_lead_repository.py
-backend/tests/test_leads_api.py
-```
-
-## New frontend file
-
-```text
-frontend/src/pages/MyLeadsPage.tsx
-```
-
-## Important modified files
-
-```text
 backend/app/main.py
-backend/app/db/dependencies.py
-backend/app/core/config.py
+backend/requirements.txt
+backend/.env.example
+
 frontend/src/App.tsx
 frontend/src/lib/api.ts
-frontend/src/lib/api.test.ts
 frontend/src/pages/FindLeadsPage.tsx
-frontend/src/components/Icon.tsx
-frontend/src/components/Sidebar.tsx
+frontend/package.json
+
+render.yaml
 ```
 
-No new package or database migration is required.
+## Environment change
+
+Add one stable server-side encryption key:
+
+```env
+CREDENTIAL_ENCRYPTION_KEY=
+```
+
+Generate it with:
+
+```powershell
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+```
+
+Do not regenerate the key after credentials are stored.
+
+## Database
+
+No migration is required. The existing `provider_connections` and `jobs` tables are used.
+
+## Rollback
+
+See `ROLLBACK.md`. The source update can be rolled back without a database schema rollback.

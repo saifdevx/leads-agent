@@ -1,14 +1,19 @@
-LEAD PLATFORM — FREE LEAD FINDER RELEASE
+LEAD PLATFORM — AUTOMATED DISCOVERY UPDATE
 
 Purpose:
-- Generate free Google-style search queries.
-- Import visible search-result text.
-- Extract and deduplicate public lead/contact details.
-- Save leads to Turso and review them in My Leads.
+- Make Find Leads fully automatic through supported search APIs.
+- Add secure BYOK integrations for Serper, Brave, Gemini and OpenAI.
+- Crawl public company websites for missing contact details.
+- Improve extraction quality and deduplicate before saving.
 
-No new npm package.
-No new Python package.
-No new database migration.
+New Python dependency:
+- cryptography==50.0.1
+
+No new frontend dependency.
+No database migration required.
+
+New required backend environment variable:
+- CREDENTIAL_ENCRYPTION_KEY
 
 Preserve locally:
 - .git/
@@ -19,8 +24,10 @@ Preserve locally:
 - frontend/node_modules/
 
 Acceptance:
-- Backend tests pass.
+- Existing authentication regression passes.
+- Existing database regression passes.
+- Provider keys can connect and disconnect without being returned in plaintext.
+- Automated search completes using Serper or Brave.
+- Results save to Turso and appear in My Leads.
+- Manual fallback remains functional.
 - Frontend typecheck/tests/build pass.
-- Authentication regression passes.
-- Duplicate import test passes.
-- Cross-user data isolation passes where possible.

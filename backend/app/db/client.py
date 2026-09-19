@@ -134,6 +134,28 @@ class TursoHttpClient:
         execute_response = self._require_ok(first, expected_type="execute")
         return self._query_result(execute_response["result"])
 
+    def execute_batch(
+        self,
+        statements: list[tuple[str, Sequence[Any], bool]],
+    ) -> list[QueryResult]:
+        if not statements:
+            return []
+
+        requests: list[dict[str, Any]] = []
+        for sql, params, want_rows in statements:
+            statement: dict[str, Any] = {"sql": sql, "want_rows": want_rows}
+            if params:
+                statement["args"] = [_encode_value(value) for value in params]
+            requests.append({"type": "execute", "stmt": statement})
+        requests.append({"type": "close"})
+
+        response = self._pipeline(requests)
+        results: list[QueryResult] = []
+        for raw in response["results"][:-1]:
+            execute_response = self._require_ok(raw, expected_type="execute")
+            results.append(self._query_result(execute_response["result"]))
+        return results
+
     def execute_sequence(self, sql: str) -> None:
         response = self._pipeline(
             [

@@ -1,25 +1,34 @@
 # Changelog
 
-## Free lead finder
+## Automated lead discovery + BYOK integrations
 
 ### Added
-- Free search-plan generator based on niche and optional location.
-- Search queries for general web, Gmail mentions, Instagram, Facebook and LinkedIn company pages.
-- Manual paste/import workflow for visible search-result text.
-- Public email, phone, website and social-link extraction.
-- Best-effort company-name inference.
-- Duplicate prevention before inserting leads into Turso.
-- Lead-list API and authenticated lead API.
-- Functional **My Leads** table with list filtering and client-side search.
-- Clear extraction summary showing extracted, added, duplicate and skipped records.
+- Fully automated lead search through Serper and Brave Search.
+- User-owned search-provider API keys.
+- User-owned Gemini and OpenAI API keys.
+- Server-side Fernet encryption for provider credentials.
+- Provider validation/connect/disconnect endpoints.
+- Functional Settings integration screen.
+- Background search jobs with progress polling.
+- Website contact-page crawling for missing public contact details.
+- Optional AI structured extraction and relevance filtering.
+- Automatic fallback to deterministic extraction if no AI provider is connected or AI extraction fails.
+- Search-call and website-crawl limits to control cost/runaway work.
+- Evidence post-validation for AI-returned emails, phones and URLs.
+- Cost-aware Smart search mode: Serper first, Brave fallback.
+- Batched Turso writes for lead imports.
+- Reduced Turso latency by avoiding repeated user-sync/provider lookups on every protected API call.
+- Provider credentials are snapshotted once per discovery job instead of re-reading Turso for every query.
+- Manual paste/import kept as a fallback mode.
 
 ### Changed
-- Removed development-version copy from the sidebar.
-- Find Leads is now functional instead of a placeholder.
-- My Leads is now functional instead of a placeholder.
+- Find Leads now defaults to one-click automatic discovery.
+- Search queries prioritize the proven Instagram/Gmail-style discovery patterns.
+- Weak social-only results do not count toward the requested lead target unless a practical contact path is found.
+- My Leads receives automatically discovered records from connected providers.
 
 ### Preserved
-- Firebase authentication behavior.
-- Turso user synchronization.
-- Existing database schema.
-- Outreach and Settings placeholders.
+- Firebase authentication.
+- Turso persistence and existing schema.
+- Manual lead import.
+- Existing lead-list and lead-table behavior.

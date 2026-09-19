@@ -1,21 +1,46 @@
 # Lead Platform
 
-A free-first lead generation web app built with React/Vite, FastAPI, Firebase Authentication and Turso.
+A free-first/BYOK lead-generation web application built with React/Vite, FastAPI, Firebase Authentication and Turso.
 
-## Current capabilities
+## What this build adds
 
-- Firebase email/password and Google authentication
-- Server-side Firebase token verification
-- Turso persistence
-- Simple navigation: Find Leads, My Leads, Outreach, Settings
-- Free lead-search plan generation
-- Google-style query generation for websites and social profiles
-- Manual paste/import of visible search-result text
-- Contact extraction for public business emails, phone numbers, websites and social URLs
-- In-list deduplication before saving
-- Lead lists and a searchable My Leads table
+The main Find Leads workflow is now automated when a supported search provider is connected.
 
-Paid search, AI enrichment and email outreach are intentionally not enabled yet.
+A user can enter:
+
+```text
+Niche: Solar panel installers
+Location: Texas, USA
+Leads wanted: 100
+```
+
+and click **Find Leads**. The backend then:
+
+1. Generates high-signal prospecting queries based on the proven Google workflow.
+2. Searches through the selected provider. Smart mode prefers Serper for Google-style results and falls back to Brave when Serper is not connected.
+3. Extracts contact/business information from search-result evidence.
+4. Optionally uses Gemini or OpenAI structured output to improve extraction and relevance filtering.
+5. Checks public company websites for missing email/phone/social contact information.
+6. Deduplicates results.
+7. Grounds AI-returned contact fields back to actual search evidence, then saves useful leads to Turso in batches.
+8. Exposes live progress in the UI.
+
+The existing manual copy/paste workflow remains available as a fallback.
+
+## BYOK integrations
+
+Settings now supports encrypted user-owned API keys for:
+
+- **Serper** — Google-style automated search. Recommended primary discovery source.
+- **Brave Search** — independent web-search coverage.
+- **Gemini** — optional AI cleanup / structured extraction.
+- **OpenAI** — optional AI cleanup / structured extraction.
+
+Plaintext API keys are validated by the backend and encrypted before they are stored in Turso. They are never returned to the browser after saving.
+
+## Important design decision
+
+Google Places is not used as a persistent lead-data source in this build. Google Maps Platform places restrictions on storing/caching Places API content. We can revisit a compliant Places integration later if it materially improves the product.
 
 ## Updating an existing local project
 
@@ -34,19 +59,30 @@ frontend/node_modules/
 
 Do not replace or commit real `.env` files.
 
-## Local environment update
+## New backend environment variable
 
-Your existing Turso/Firebase settings stay the same. Only update the backend application version if you keep it in your real `.env`:
+Generate one Fernet encryption key and keep it stable for the lifetime of the stored provider credentials:
 
-```env
-APP_VERSION=0.4.0
+```powershell
+cd D:\Leads-Agent\leads-agent\backend
+.venv\Scripts\Activate.ps1
+python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
 
-No new Firebase, Turso or frontend environment variables are required.
+Copy the generated value into `backend/.env`:
 
-## Frontend
+```env
+APP_VERSION=0.5.0
+CREDENTIAL_ENCRYPTION_KEY=PASTE_GENERATED_VALUE_HERE
+```
 
-No new npm dependency is required.
+Keep your existing Firebase and Turso values unchanged.
+
+**Do not regenerate this key after provider credentials have been saved.** Existing encrypted keys would no longer be decryptable.
+
+## Frontend setup
+
+No new frontend package is required.
 
 ```powershell
 cd D:\Leads-Agent\leads-agent\frontend
@@ -57,46 +93,58 @@ npm run build
 npm run dev
 ```
 
-## Backend
+## Backend setup
 
-No new Python dependency is required.
+This build explicitly adds `cryptography` as a direct dependency for BYOK credential encryption. It may already exist through Firebase, but install from the requirements file so the dependency is intentional and reproducible.
 
 ```powershell
 cd D:\Leads-Agent\leads-agent\backend
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pytest -q
+python -m app.db.migrate
 uvicorn app.main:app --reload --port 8000
 ```
 
-No new database migration is required for the free lead finder because the existing `lead_lists` and `leads` schema already supports it. Running the migration command is still safe:
+There is no new database migration because `provider_connections` and `jobs` already exist in the current schema.
 
-```powershell
-python -m app.db.migrate
-```
-
-It should report that the database schema is already up to date.
-
-## Free lead workflow
+## First automated-search test
 
 1. Sign in.
-2. Open **Find Leads**.
-3. Enter niche, location and target lead count.
-4. Click **Create free search plan**.
-5. Open one of the generated Google searches.
-6. Copy visible result text from relevant results/pages.
-7. Paste the text into Lead Platform.
-8. Click **Extract & save leads**.
-9. Open **My Leads** to review saved contacts.
+2. Open **Settings**.
+3. Connect **Serper** or **Brave Search**.
+4. Optionally connect Gemini or OpenAI.
+5. Return to **Find Leads**.
+6. Enter a niche/location and request 25 leads for the first test.
+7. Click **Find Leads**.
+8. Watch progress until complete.
+9. Open **My Leads** and review quality/source data.
 
-The parser is best-effort. It extracts public data that is present in the pasted text; it does not fabricate missing contact details.
+For the first real quality test, connect **Serper + Gemini** (or OpenAI). Serper most closely automates the prior Google-search workflow; AI improves structured extraction and relevance filtering without being allowed to invent missing contact details.
 
-## Important limitation
+## Search behavior and cost control
 
-This release does not automatically scrape Google, Instagram, LinkedIn or Facebook. It generates useful queries and processes text the user chooses to paste. Automated search-provider integrations come later through supported APIs/adapters.
+The app uses a bounded search budget (up to 30 search API calls per run in this build) and stops when either:
 
-## Source control
+- the requested number of useful unique leads is reached, or
+- the search-call budget is reached.
 
-After local tests and a real import test pass, commit normally using your preferred professional commit message. No Git tag or public checkpoint naming is required.
+The automated workflow does not directly scrape Google HTML, Instagram, LinkedIn or Facebook. It uses supported search APIs to retrieve indexed public search results, then optionally visits public company websites.
+
+## AI behavior
+
+Gemini/OpenAI are optional. Search still works without them using deterministic extraction.
+
+When enabled, AI is used to:
+
+- associate search snippets with the correct business,
+- reject obviously irrelevant pages/directories/jobs/articles,
+- extract structured fields without inventing missing contact details.
+
+The AI prompt explicitly requires evidence-grounded extraction; missing data remains missing.
+
+## Next provider layer
+
+After automated discovery quality is validated, the next provider layer should add verified enrichment/decision-maker sources such as Prospeo and Apollo. That layer should only spend credits on leads that still need verified contact data.
 
 See `docs/TEST_CHECKLIST.md` for acceptance tests and `docs/ROLLBACK.md` for rollback guidance.

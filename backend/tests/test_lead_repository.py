@@ -8,6 +8,11 @@ class FakeDatabase:
         self.calls = []
         self.select_count = 0
 
+    def execute_batch(self, statements):
+        for sql, params, want_rows in statements:
+            self.calls.append((sql, params, want_rows))
+        return [QueryResult([], [], 1, None, 0, 1) for _ in statements]
+
     def execute(self, sql, params=(), *, want_rows=True):
         self.calls.append((sql, params, want_rows))
         if "FROM lead_lists ll" in sql and "ll.id = ?" in sql:
@@ -23,7 +28,7 @@ class FakeDatabase:
             )
         if "SELECT email, domain, phone" in sql:
             return QueryResult([], [], 0, None, 0, 0)
-        if "FROM leads" in sql and "created_at = ?" in sql:
+        if "FROM leads" in sql and "id IN" in sql:
             return QueryResult(
                 [],
                 [{
@@ -34,7 +39,7 @@ class FakeDatabase:
                     "instagram_url": None, "facebook_url": None, "city": None,
                     "region": "Texas", "country": None, "source": "manual_search_import",
                     "source_url": "https://sun.co", "source_query": None, "score": None,
-                    "status": "discovered", "created_at": params[2], "updated_at": params[2],
+                    "status": "discovered", "created_at": "2026-09-17T00:00:00+00:00", "updated_at": "2026-09-17T00:00:00+00:00",
                 }],
                 0, None, 1, 0,
             )

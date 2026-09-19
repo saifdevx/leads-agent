@@ -37,7 +37,7 @@ services:
       - key: APP_ENV
         value: production
       - key: APP_VERSION
-        value: 0.4.0
+        value: 0.5.0
       - key: CORS_ORIGINS
         sync: false
       - key: LOG_LEVEL
@@ -52,3 +52,5 @@ services:
         sync: false
       - key: TURSO_TIMEOUT_SECONDS
         value: 10
+      - key: CREDENTIAL_ENCRYPTION_KEY
+        sync: false

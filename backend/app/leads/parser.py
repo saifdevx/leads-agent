@@ -33,6 +33,9 @@ class ParsedLead:
     company_name: str | None = None
     website: str | None = None
     domain: str | None = None
+    first_name: str | None = None
+    last_name: str | None = None
+    job_title: str | None = None
     email: str | None = None
     email_status: str | None = None
     phone: str | None = None
@@ -43,6 +46,7 @@ class ParsedLead:
     source: str = "manual_search_import"
     source_url: str | None = None
     source_query: str | None = None
+    score: float | None = None
 
 
 def _clean_url(value: str) -> str:

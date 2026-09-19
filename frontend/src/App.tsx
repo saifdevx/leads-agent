@@ -11,6 +11,7 @@ import { AuthVerificationErrorPage } from './pages/AuthVerificationErrorPage'
 import { FindLeadsPage } from './pages/FindLeadsPage'
 import { MyLeadsPage } from './pages/MyLeadsPage'
 import { PlaceholderPage } from './pages/PlaceholderPage'
+import { SettingsPage } from './pages/SettingsPage'
 
 type PageKey = 'find' | 'leads' | 'outreach' | 'settings'
 type HealthState = 'loading' | 'online' | 'offline'
@@ -45,13 +46,13 @@ function Workspace({ user, identity, onSignOut }: { user: User; identity: Authen
 
   let content
   if (page === 'find') {
-    content = <FindLeadsPage getToken={getToken} onViewLeads={() => setPage('leads')} />
+    content = <FindLeadsPage getToken={getToken} onViewLeads={() => setPage('leads')} onOpenSettings={() => setPage('settings')} />
   } else if (page === 'leads') {
     content = <MyLeadsPage getToken={getToken} />
   } else if (page === 'outreach') {
     content = <PlaceholderPage title="Outreach" description="Outreach will stay intentionally simple: choose leads, select a template and sender, preview the batch, then approve the campaign." icon="mail" checkpoint="Outreach" bullets={['User templates', 'Gmail sender', 'Daily limits', 'Pause and resume']} />
   } else {
-    content = <PlaceholderPage title="Settings" description="All user configuration will live in one place. Providers, AI and email connections will be grouped into clear tabs rather than scattered across technical pages." icon="settings" checkpoint="Integrations" bullets={['Search providers', 'Gemini / OpenAI', 'Enrichment providers', 'Email connections']} />
+    content = <SettingsPage getToken={getToken} />
   }
 
   return (

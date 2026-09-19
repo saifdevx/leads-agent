@@ -1,12 +1,12 @@
-# Firebase Setup — Checkpoint 2
+# Firebase Setup
 
-This checkpoint uses Firebase Authentication in the browser and Firebase Admin only on the FastAPI server.
+This application uses Firebase Authentication in the browser and Firebase Admin only on the FastAPI server.
 
 ## A. Create or choose a Firebase project
 
 1. Open Firebase Console.
 2. Create a project, or select the project you want to use for Lead Platform.
-3. You do not need Firestore, Realtime Database, or Firebase Storage for this checkpoint.
+3. You do not need Firestore, Realtime Database, or Firebase Storage for this application.
 
 ## B. Enable authentication methods
 
@@ -17,7 +17,7 @@ This checkpoint uses Firebase Authentication in the browser and Firebase Admin o
 5. Enable **Google**.
 6. For Google, select the project support email and save.
 
-Do not enable phone/SMS authentication for this checkpoint.
+Do not enable phone/SMS authentication for this application.
 
 ## C. Create the Firebase Web App
 
@@ -74,7 +74,7 @@ Update `backend/.env`:
 
 ```env
 APP_NAME=Lead Platform API
-APP_VERSION=0.3.0
+APP_VERSION=<use the value from backend/.env.example>
 APP_ENV=development
 CORS_ORIGINS=http://localhost:5173
 LOG_LEVEL=INFO
@@ -127,4 +127,4 @@ The application supports `FIREBASE_SERVICE_ACCOUNT_JSON` specifically so the ent
 
 The frontend Render service needs the `VITE_FIREBASE_*` values during its build because Vite injects them into the built frontend bundle.
 
-Deployment itself remains a later checkpoint; this section only ensures the application is deployable without changing authentication architecture.
+This section only covers authentication configuration; deployment uses the same authentication architecture.

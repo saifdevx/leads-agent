@@ -10,8 +10,11 @@ from fastapi.responses import JSONResponse
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.leads import router as leads_router
+from app.api.jobs import router as jobs_router
+from app.api.providers import router as providers_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
+from app.providers.security import CredentialEncryptionError
 from app.db.client import (
     DatabaseConfigurationError,
     DatabaseQueryError,
@@ -106,6 +109,24 @@ async def database_configuration_handler(request: Request, exc: DatabaseConfigur
     )
 
 
+@app.exception_handler(CredentialEncryptionError)
+async def credential_encryption_handler(request: Request, exc: CredentialEncryptionError):
+    logger.error(
+        "Provider credential encryption is not configured",
+        extra={"request_id": getattr(request.state, "request_id", None)},
+    )
+    return JSONResponse(
+        status_code=503,
+        content={
+            "error": {
+                "code": "provider_storage_not_configured",
+                "message": "Provider credential encryption is not configured on the server.",
+                "request_id": getattr(request.state, "request_id", None),
+            }
+        },
+    )
+
+
 @app.exception_handler(DatabaseUnavailableError)
 async def database_unavailable_handler(request: Request, exc: DatabaseUnavailableError):
     logger.warning(
@@ -164,3 +185,5 @@ async def unexpected_exception_handler(request: Request, exc: Exception):
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(leads_router)
+app.include_router(providers_router)
+app.include_router(jobs_router)

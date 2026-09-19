@@ -119,3 +119,57 @@ def test_sql_error_does_not_expose_remote_message():
     assert str(exc_info.value) == "The database operation failed."
     assert exc_info.value.code == "SQLITE_CONSTRAINT"
     assert "private@example.com" not in str(exc_info.value)
+
+
+def test_execute_batch_uses_one_pipeline_for_multiple_statements():
+    observed = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        observed["payload"] = json.loads(request.content)
+        return httpx.Response(
+            200,
+            json={
+                "baton": None,
+                "base_url": None,
+                "results": [
+                    {
+                        "type": "ok",
+                        "response": {
+                            "type": "execute",
+                            "result": {
+                                "cols": [], "rows": [], "affected_row_count": 1,
+                                "last_insert_rowid": None, "rows_read": 0, "rows_written": 1,
+                            },
+                        },
+                    },
+                    {
+                        "type": "ok",
+                        "response": {
+                            "type": "execute",
+                            "result": {
+                                "cols": [{"name": "count"}],
+                                "rows": [[{"type": "integer", "value": "2"}]],
+                                "affected_row_count": 0, "last_insert_rowid": None,
+                                "rows_read": 1, "rows_written": 0,
+                            },
+                        },
+                    },
+                    {"type": "ok", "response": {"type": "close"}},
+                ],
+            },
+        )
+
+    client = TursoHttpClient(
+        "https://lead-db.example.turso.io",
+        "token",
+        transport=httpx.MockTransport(handler),
+    )
+    results = client.execute_batch([
+        ("INSERT INTO leads(id) VALUES (?)", ("lead-1",), False),
+        ("SELECT COUNT(*) AS count FROM leads", (), True),
+    ])
+
+    assert len(observed["payload"]["requests"]) == 3
+    assert len(results) == 2
+    assert results[0].affected_row_count == 1
+    assert results[1].rows == [{"count": 2}]
