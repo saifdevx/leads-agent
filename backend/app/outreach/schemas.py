@@ -25,6 +25,11 @@ class SenderResponse(BaseModel):
 class GmailAuthorizeResponse(BaseModel):
     authorization_url: str
 
+class HostingerConnectRequest(BaseModel):
+    api_token: str = Field(min_length=10, max_length=500)
+    mailbox_email: str | None = Field(default=None, max_length=320)
+    display_name: str | None = Field(default=None, max_length=120)
+
 class CampaignCreate(BaseModel):
     name: str = Field(min_length=2, max_length=140)
     lead_ids: list[str] = Field(min_length=1, max_length=500)

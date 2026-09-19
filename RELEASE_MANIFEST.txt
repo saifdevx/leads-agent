@@ -1,37 +1,24 @@
-LEAD PLATFORM — COMBINED OUTREACH MVP
+LEAD PLATFORM — HOSTINGER MAIL SENDER UPDATE
 
-This bundle deliberately combines several previously planned mini-steps:
-- User email templates
-- Gmail OAuth sender connection
-- Encrypted OAuth token storage
-- Lead selection → Outreach handoff
-- Campaign draft creation
-- Message preview
-- Explicit approval gate
-- Persistent email queue
-- Separate worker process
-- Gmail API sending
-- Daily sending limits
-- Sending windows/timezone
-- Minimum interval
-- Pause/resume/cancel
-- Suppression filtering
-- Duplicate protection within a campaign
-- Basic campaign metrics
+Adds Hostinger Agentic Mail as a first-class sender while preserving Gmail as optional.
 
-New migration:
-- backend/migrations/002_outreach.sql
+Included:
+- Hostinger API-token connection in Outreach → Senders
+- Token validation using Hostinger GET /api/v1/me
+- Automatic mailbox discovery / optional mailbox selection
+- Encrypted token storage using existing CREDENTIAL_ENCRYPTION_KEY
+- Hostinger send support in the existing outreach worker
+- Existing campaign preview and explicit approval gate
+- Existing daily limits, sending windows, minimum interval, pause/resume/cancel, suppression, and duplicate-send protection
+- Hostinger backend tests
+- docs/HOSTINGER_SETUP.md
 
-New environment variables:
-- FRONTEND_APP_URL
-- GMAIL_OAUTH_CLIENT_ID
-- GMAIL_OAUTH_CLIENT_SECRET
-- GMAIL_OAUTH_REDIRECT_URI
+Database:
+- No new migration. Existing sender_connections is provider-neutral and reused.
 
-No new Python package dependency is required for Gmail; OAuth and Gmail REST calls use existing httpx.
-
-Local sending requires a third process:
-- python -m app.outreach.worker
+Environment:
+- No new secret environment variables for Hostinger. Users connect their Hostinger token inside the app.
+- Gmail OAuth variables remain optional.
 
 Preserve locally:
 - .git/
@@ -44,4 +31,7 @@ Preserve locally:
 Never change or lose:
 - CREDENTIAL_ENCRYPTION_KEY
 
-First send test must use one recipient email you control.
+First sending test:
+- Connect Hostinger in Outreach → Senders.
+- Select exactly one lead whose recipient email you control.
+- Preview, approve, and run `python -m app.outreach.worker`.

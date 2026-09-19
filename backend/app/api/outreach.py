@@ -10,11 +10,12 @@ from app.db.dependencies import get_lead_repository
 from app.leads.repository import LeadRepository
 from app.outreach.dependencies import get_outreach_repository
 from app.outreach.gmail import GmailError, exchange_code, user_info
+from app.outreach.hostinger import HostingerMailError, choose_mailbox, get_mailboxes
 from app.outreach.oauth import authorization_url, make_state, verify_state
 from app.outreach.repository import OutreachNotFoundError, OutreachRepository
 from app.outreach.schemas import (
     CampaignCreate, CampaignCreateResponse, CampaignPreviewItem, CampaignResponse,
-    GmailAuthorizeResponse, SenderResponse, SuppressionCreate, TemplateCreate, TemplateResponse,
+    GmailAuthorizeResponse, HostingerConnectRequest, SenderResponse, SuppressionCreate, TemplateCreate, TemplateResponse,
 )
 
 router = APIRouter(prefix="/api/v1/outreach", tags=["outreach"])
@@ -45,6 +46,29 @@ def delete_template(template_id: str, current_user: AuthenticatedUser = Depends(
 @router.get("/senders", response_model=list[SenderResponse])
 def senders(current_user: AuthenticatedUser = Depends(get_current_user), repo: OutreachRepository = Depends(get_outreach_repository)):
     return [SenderResponse(**row) for row in repo.list_senders(current_user.uid)]
+
+@router.post("/hostinger/connect", response_model=SenderResponse)
+def hostinger_connect(
+    data: HostingerConnectRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    repo: OutreachRepository = Depends(get_outreach_repository),
+):
+    try:
+        mailboxes = get_mailboxes(data.api_token)
+        mailbox = choose_mailbox(mailboxes, data.mailbox_email)
+        sender = repo.save_hostinger_sender(
+            current_user.uid,
+            mailbox.address,
+            (data.display_name or mailbox.address).strip(),
+            {
+                "api_token": data.api_token,
+                "mailbox_resource_id": mailbox.resource_id,
+            },
+        )
+        return SenderResponse(**sender)
+    except HostingerMailError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
 
 @router.get("/gmail/authorize-url", response_model=GmailAuthorizeResponse)
 def gmail_authorize(current_user: AuthenticatedUser = Depends(get_current_user)):

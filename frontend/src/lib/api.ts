@@ -378,6 +378,15 @@ export async function getGmailAuthorizeUrl(idToken: string): Promise<string> {
   const result = await authRequest<{ authorization_url: string }>('/api/v1/outreach/gmail/authorize-url', idToken)
   return result.authorization_url
 }
+export async function connectHostingerSender(
+  idToken: string,
+  input: { api_token: string; mailbox_email?: string; display_name?: string },
+): Promise<SenderConnection> {
+  return authRequest<SenderConnection>('/api/v1/outreach/hostinger/connect', idToken, {
+    method: 'POST',
+    body: JSON.stringify(input),
+  })
+}
 export async function disconnectSender(idToken: string, senderId: string): Promise<void> {
   await authRequest(`/api/v1/outreach/senders/${encodeURIComponent(senderId)}`, idToken, { method: 'DELETE' })
 }

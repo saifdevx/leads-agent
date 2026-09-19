@@ -4,7 +4,7 @@ A free-first/BYOK lead discovery, enrichment, export, and outreach web applicati
 
 ## Current product flow
 
-`Find Leads → Enrich → Review/Export → Select Leads → Outreach → Preview → Approve → Queue → Gmail`
+`Find Leads → Enrich → Review/Export → Select Leads → Outreach → Preview → Approve → Queue → Hostinger/Gmail`
 
 ## Stack
 
@@ -15,7 +15,8 @@ A free-first/BYOK lead discovery, enrichment, export, and outreach web applicati
 - Serper / Brave discovery adapters
 - Gemini / OpenAI AI adapters
 - Prospeo / Apollo enrichment adapters
-- Gmail OAuth + Gmail API sending
+- Hostinger Agentic Mail API sending
+- Optional Gmail OAuth + Gmail API sending
 - XlsxWriter exports
 
 ## Local startup
@@ -50,10 +51,10 @@ cd backend
 python -m app.outreach.worker
 ```
 
-See `docs/OUTREACH_SETUP.md` for Gmail OAuth configuration and the first-send test procedure.
+See `docs/HOSTINGER_SETUP.md` for the recommended Hostinger sender setup. Gmail remains optional; its setup is documented in `docs/OUTREACH_SETUP.md`.
 
 ## Security
 
 Do not commit `.env`, Firebase service-account files, Turso tokens, provider API keys, Google OAuth client secrets, or `CREDENTIAL_ENCRYPTION_KEY`.
 
-User provider keys and Gmail tokens are stored encrypted using the existing credential-encryption key.
+User provider keys, Hostinger tokens, and Gmail tokens are stored encrypted using the existing credential-encryption key.

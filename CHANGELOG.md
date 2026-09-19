@@ -1,5 +1,17 @@
 # Changelog
 
+## Hostinger Mail sender support
+
+- Added Hostinger Agentic Mail API token connection
+- Validates tokens against `GET /api/v1/me` and discovers allowed mailboxes
+- Supports tokens scoped to one or multiple mailboxes
+- Encrypts Hostinger API tokens with the existing credential encryption key
+- Added Hostinger sending to the existing outreach worker
+- Existing campaign approval, daily limits, sending windows, minimum interval, suppression, pause/resume/cancel behavior remain unchanged
+- Gmail remains available as an optional sender
+- Added Hostinger-specific backend tests and setup documentation
+- No database migration required; the existing generic `sender_connections` table is reused
+
 ## Combined Outreach MVP
 
 Added a larger feature bundle to accelerate the project:

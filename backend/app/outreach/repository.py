@@ -51,6 +51,16 @@ class OutreachRepository:
             sid=str(uuid4())
             self.database.execute("INSERT INTO sender_connections(id,user_id,provider,email,display_name,credentials_ciphertext,status,created_at,updated_at) VALUES(?, ?, 'gmail', ?, ?, ?, 'connected', ?, ?)", (sid, user_id, email, display_name, encrypted, ts, ts), want_rows=False)
         return self.get_sender(user_id,sid)
+    def save_hostinger_sender(self,user_id,email,display_name,credentials):
+        ts=now(); encrypted=self.cipher.encrypt(credentials)
+        existing=self.database.execute("SELECT id FROM sender_connections WHERE user_id=? AND provider='hostinger' AND email=?",(user_id,email)).rows
+        if existing:
+            sid=existing[0]["id"]
+            self.database.execute("UPDATE sender_connections SET display_name=?,credentials_ciphertext=?,status='connected',last_error=NULL,updated_at=? WHERE id=? AND user_id=?",(display_name,encrypted,ts,sid,user_id),want_rows=False)
+        else:
+            sid=str(uuid4())
+            self.database.execute("INSERT INTO sender_connections(id,user_id,provider,email,display_name,credentials_ciphertext,status,created_at,updated_at) VALUES(?, ?, 'hostinger', ?, ?, ?, 'connected', ?, ?)", (sid, user_id, email, display_name, encrypted, ts, ts), want_rows=False)
+        return self.get_sender(user_id,sid)
     def update_sender_credentials(self,user_id,sender_id,credentials):
         self.database.execute("UPDATE sender_connections SET credentials_ciphertext=?,status='connected',last_error=NULL,updated_at=? WHERE user_id=? AND id=?",(self.cipher.encrypt(credentials),now(),user_id,sender_id),want_rows=False)
     def sender_error(self,user_id,sender_id,message):

@@ -34,3 +34,12 @@ def test_campaign_creation_renders_and_queues_only_after_approval():
     assert repo.due_messages()==[]
     repo.approve_campaign('u',campaign['id'])
     assert len(repo.due_messages())==1
+
+
+def test_hostinger_sender_credentials_are_encrypted_and_read_back():
+    repo=OutreachRepository(SqliteAdapter(), CredentialCipher(Fernet.generate_key().decode()))
+    sender=repo.save_hostinger_sender('u','sales@example.com','Sales',{'api_token':'secret-token','mailbox_resource_id':'AC123'})
+    assert sender['provider']=='hostinger'
+    stored=repo.get_sender('u',sender['id'],with_credentials=True)
+    assert stored['credentials']['api_token']=='secret-token'
+    assert stored['credentials']['mailbox_resource_id']=='AC123'
