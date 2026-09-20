@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../components/Icon'
 import {
   ApiRequestError,
@@ -6,6 +6,7 @@ import {
   getJob,
   getLeadLists,
   getLeads,
+  importLeadFile,
   startLeadEnrichment,
   type Lead,
   type LeadList,
@@ -47,6 +48,8 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
   const [enriching, setEnriching] = useState(false)
   const [enrichProvider, setEnrichProvider] = useState<EnrichmentProvider>('auto')
   const [targetTitles, setTargetTitles] = useState(DEFAULT_TITLES)
+  const [importingFile, setImportingFile] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
     let active = true
@@ -189,6 +192,25 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
     }
   }
 
+  async function handleLeadFile(file: File | null) {
+    if (!file) return
+    setImportingFile(true)
+    setError(null)
+    setNotice(null)
+    try {
+      const token = await getToken()
+      const result = await importLeadFile(token, file)
+      setNotice(`Imported ${result.added_count} lead${result.added_count === 1 ? '' : 's'} from ${file.name}. ${result.duplicate_count ? `${result.duplicate_count} duplicate${result.duplicate_count === 1 ? '' : 's'} merged/skipped.` : ''}`.trim())
+      setSelectedList(result.lead_list.id)
+      setRefreshKey((value) => value + 1)
+    } catch (nextError) {
+      setError(nextError instanceof ApiRequestError ? nextError.message : 'Could not import this lead sheet.')
+    } finally {
+      setImportingFile(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
   return (
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -217,6 +239,15 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
               <p className="mt-1 text-sm text-[#777A87]">Filter, enrich, select and export your best prospects without leaving this screen.</p>
             </div>
             <div className="flex flex-wrap gap-2">
+              <input ref={fileInputRef} type="file" accept=".xlsx,.csv" className="hidden" onChange={(event) => void handleLeadFile(event.target.files?.[0] || null)} />
+              <button
+                type="button"
+                disabled={importingFile}
+                onClick={() => fileInputRef.current?.click()}
+                className="focus-ring inline-flex h-10 items-center gap-2 rounded-[9px] border border-[#DDDDE4] bg-white px-3.5 text-sm font-bold text-[#555966] hover:bg-[#F8F8FA] disabled:opacity-50"
+              >
+                <Icon name="import" className="h-4 w-4 rotate-180" /> {importingFile ? 'Importing…' : 'Import Excel / CSV'}
+              </button>
               <button
                 type="button"
                 disabled={!selectedCount}

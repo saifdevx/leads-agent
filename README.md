@@ -1,60 +1,50 @@
 # Lead Platform
 
-A free-first/BYOK lead discovery, enrichment, export, and outreach web application.
+A custom lead-generation and outreach web app built around a simple workflow:
 
-## Current product flow
+**Find leads -> review/enrich/import/export -> outreach**
 
-`Find Leads → Enrich → Review/Export → Select Leads → Outreach → Preview → Approve → Queue → Hostinger/Gmail`
+## Current capabilities
 
-## Stack
+- Firebase authentication
+- Turso application database
+- Automated lead discovery via connected search providers
+- Public website research
+- Gemini/OpenAI BYOK cleanup
+- Prospeo/Apollo BYOK enrichment
+- Excel/CSV export
+- Excel/CSV lead-sheet import
+- Email templates
+- Hostinger Mail sender
+- Optional Gmail sender
+- Campaign preview/approval
+- Persistent email queue + worker
+- Daily limits and configurable 20s+ send interval
+- Optional sending-hour window
+- Quick Send for one-off/testing email
+- Pause/resume/cancel/delete campaign controls
+- Suppression list
 
-- React + Vite + TypeScript + Tailwind
-- FastAPI
-- Firebase Authentication
-- Turso SQL-over-HTTP
-- Serper / Brave discovery adapters
-- Gemini / OpenAI AI adapters
-- Prospeo / Apollo enrichment adapters
-- Hostinger Agentic Mail API sending
-- Optional Gmail OAuth + Gmail API sending
-- XlsxWriter exports
+## Local processes
 
-## Local startup
-
-### Backend
-
+Backend:
 ```powershell
 cd backend
 .venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-python -m app.db.migrate
-pytest -q
 uvicorn app.main:app --reload --port 8000
 ```
 
-### Frontend
-
+Frontend:
 ```powershell
 cd frontend
-npm install --include=optional
-npm run check
-npm run test
-npm run build
 npm run dev
 ```
 
-### Outreach worker
-
+Outreach worker:
 ```powershell
 cd backend
 .venv\Scripts\Activate.ps1
 python -m app.outreach.worker
 ```
 
-See `docs/HOSTINGER_SETUP.md` for the recommended Hostinger sender setup. Gmail remains optional; its setup is documented in `docs/OUTREACH_SETUP.md`.
-
-## Security
-
-Do not commit `.env`, Firebase service-account files, Turso tokens, provider API keys, Google OAuth client secrets, or `CREDENTIAL_ENCRYPTION_KEY`.
-
-User provider keys, Hostinger tokens, and Gmail tokens are stored encrypted using the existing credential-encryption key.
+See `docs/PRODUCTIVITY_SETUP.md` for the latest update instructions.

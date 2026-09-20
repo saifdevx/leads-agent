@@ -78,6 +78,11 @@ class OutreachRepository:
         placeholders=','.join('?' for _ in values)
         rows=self.database.execute(f"SELECT email FROM suppression_entries WHERE user_id=? AND email IN ({placeholders})",(user_id,*values)).rows
         return {str(r['email']).lower() for r in rows}
+    def is_suppressed(self,user_id,email):
+        value=str(email or '').strip().lower()
+        if not value: return False
+        rows=self.database.execute("SELECT 1 AS ok FROM suppression_entries WHERE user_id=? AND email=? LIMIT 1",(user_id,value)).rows
+        return bool(rows)
 
     # Campaigns
     def _campaign_row(self,user_id,campaign_id):
@@ -134,6 +139,15 @@ class OutreachRepository:
         self.database.execute("UPDATE campaigns SET status=?,updated_at=? WHERE user_id=? AND id=?",(status,now(),user_id,campaign_id),want_rows=False)
         if status=='cancelled': self.database.execute("UPDATE email_messages SET status='cancelled',updated_at=? WHERE user_id=? AND campaign_id=? AND status IN ('draft','queued')",(now(),user_id,campaign_id),want_rows=False)
         return self._campaign_row(user_id,campaign_id)
+    def delete_campaign(self,user_id,campaign_id):
+        campaign=self._campaign_row(user_id,campaign_id)
+        if campaign['status'] == 'sending':
+            raise ValueError("Pause or cancel a sending campaign before deleting it.")
+        self.database.execute_batch([
+          ("DELETE FROM email_messages WHERE user_id=? AND campaign_id=?",(user_id,campaign_id),False),
+          ("DELETE FROM campaigns WHERE user_id=? AND id=?",(user_id,campaign_id),False),
+        ])
+        return True
     def campaign_preview(self,user_id,campaign_id,limit=5):
         self._campaign_row(user_id,campaign_id)
         return self.database.execute("SELECT lead_id,to_email,subject,body FROM email_messages WHERE user_id=? AND campaign_id=? ORDER BY created_at LIMIT ?",(user_id,campaign_id,limit)).rows

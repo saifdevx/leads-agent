@@ -20,3 +20,10 @@ def test_worker_defers_when_daily_limit_reached():
     allowed, next_at = _can_send_now(message, Repo(count=1), datetime(2026,1,1,12,0,tzinfo=timezone.utc))
     assert allowed is False
     assert next_at is not None
+
+
+def test_worker_allows_all_day_window_and_twenty_second_interval():
+    message = {"timezone":"UTC","send_start_hour":0,"send_end_hour":24,"daily_limit":30,"min_interval_seconds":20,"sender_id":"s"}
+    allowed, next_at = _can_send_now(message, Repo(), datetime(2026,1,1,23,30,tzinfo=timezone.utc))
+    assert allowed is True
+    assert next_at is None

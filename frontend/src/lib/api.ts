@@ -164,6 +164,29 @@ export async function getLeads(idToken: string, listId?: string): Promise<Lead[]
   return authRequest<Lead[]>(`/api/v1/leads${query}`, idToken)
 }
 
+export type LeadFileImportResult = {
+  lead_list: LeadList
+  extracted_count: number
+  added_count: number
+  duplicate_count: number
+  skipped_count: number
+  detected_columns: Record<string, string>
+  leads: Lead[]
+}
+
+export async function importLeadFile(idToken: string, file: File, listName?: string): Promise<LeadFileImportResult> {
+  const form = new FormData()
+  form.append('file', file)
+  if (listName?.trim()) form.append('list_name', listName.trim())
+  const response = await fetch(`${API_URL}/api/v1/leads/import-file`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${idToken}` },
+    body: form,
+  })
+  if (!response.ok) throw await readError(response, `Import failed with status ${response.status}`)
+  return response.json() as Promise<LeadFileImportResult>
+}
+
 export function getApiUrl() {
   return API_URL
 }
@@ -404,4 +427,14 @@ export async function campaignAction(idToken: string, campaignId: string, action
 }
 export async function suppressEmail(idToken: string, email: string, reason = 'manual'): Promise<void> {
   await authRequest('/api/v1/outreach/suppression', idToken, { method: 'POST', body: JSON.stringify({ email, reason }) })
+}
+
+export type QuickSendResult = { sent: boolean; provider_message_id: string; sender_email: string; to_email: string }
+
+export async function quickSend(idToken: string, input: { sender_id: string; to_email: string; subject: string; body: string }): Promise<QuickSendResult> {
+  return authRequest<QuickSendResult>('/api/v1/outreach/quick-send', idToken, { method: 'POST', body: JSON.stringify(input) })
+}
+
+export async function deleteCampaign(idToken: string, campaignId: string): Promise<void> {
+  await authRequest(`/api/v1/outreach/campaigns/${encodeURIComponent(campaignId)}`, idToken, { method: 'DELETE' })
 }

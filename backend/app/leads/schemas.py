@@ -64,6 +64,16 @@ class LeadImportResponse(BaseModel):
     leads: list[LeadResponse]
 
 
+class LeadFileImportResponse(BaseModel):
+    lead_list: LeadListResponse
+    extracted_count: int
+    added_count: int
+    duplicate_count: int
+    skipped_count: int
+    detected_columns: dict[str, str] = Field(default_factory=dict)
+    leads: list[LeadResponse]
+
+
 class AutomatedLeadSearchRequest(BaseModel):
     niche: str = Field(min_length=2, max_length=120)
     location: str | None = Field(default=None, max_length=120)

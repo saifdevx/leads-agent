@@ -1,37 +1,20 @@
-LEAD PLATFORM — HOSTINGER MAIL SENDER UPDATE
+Lead Platform — Productivity & Outreach Update
 
-Adds Hostinger Agentic Mail as a first-class sender while preserving Gmail as optional.
+Major additions:
+- Quick Send
+- Excel/CSV lead import
+- Optional campaign sending windows
+- 20/30/45/60/90/120 second intervals
+- Outreach auto/manual refresh
+- Campaign progress bars
+- Campaign cleanup/delete
+- Worker polling every 5 seconds
 
-Included:
-- Hostinger API-token connection in Outreach → Senders
-- Token validation using Hostinger GET /api/v1/me
-- Automatic mailbox discovery / optional mailbox selection
-- Encrypted token storage using existing CREDENTIAL_ENCRYPTION_KEY
-- Hostinger send support in the existing outreach worker
-- Existing campaign preview and explicit approval gate
-- Existing daily limits, sending windows, minimum interval, pause/resume/cancel, suppression, and duplicate-send protection
-- Hostinger backend tests
-- docs/HOSTINGER_SETUP.md
+New dependencies:
+- openpyxl==3.1.5
+- python-multipart==0.0.20
 
-Database:
-- No new migration. Existing sender_connections is provider-neutral and reused.
+Database migration:
+- None
 
-Environment:
-- No new secret environment variables for Hostinger. Users connect their Hostinger token inside the app.
-- Gmail OAuth variables remain optional.
-
-Preserve locally:
-- .git/
-- backend/.env
-- backend/.venv/
-- frontend/.env
-- frontend/package-lock.json
-- frontend/node_modules/
-
-Never change or lose:
-- CREDENTIAL_ENCRYPTION_KEY
-
-First sending test:
-- Connect Hostinger in Outreach → Senders.
-- Select exactly one lead whose recipient email you control.
-- Preview, approve, and run `python -m app.outreach.worker`.
+Keep local secrets and CREDENTIAL_ENCRYPTION_KEY unchanged.

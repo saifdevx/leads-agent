@@ -1,4 +1,6 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
+from pathlib import Path
+
+from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
 
 from app.auth.dependencies import get_current_user
@@ -9,6 +11,7 @@ from app.jobs.repository import JobRepository
 from app.leads.discovery import LeadDiscoveryService
 from app.leads.enrichment import LeadEnrichmentService
 from app.leads.exporting import export_csv, export_xlsx, filter_export_rows
+from app.leads.file_import import parse_lead_file
 from app.providers.dependencies import get_provider_repository
 from app.providers.repository import ProviderRepository
 from app.leads.parser import parse_leads
@@ -18,6 +21,7 @@ from app.leads.schemas import (
     AutomatedLeadSearchResponse,
     LeadImportRequest,
     LeadImportResponse,
+    LeadFileImportResponse,
     LeadListResponse,
     LeadResponse,
     LeadSearchRequest,
@@ -178,6 +182,41 @@ def import_search_text(
         added_count=len(added_rows),
         duplicate_count=duplicate_count,
         skipped_count=skipped_count,
+        leads=[LeadResponse(**row) for row in added_rows],
+    )
+
+
+@router.post("/leads/import-file", response_model=LeadFileImportResponse)
+async def import_lead_file(
+    file: UploadFile = File(...),
+    list_name: str | None = Form(default=None),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    repository: LeadRepository = Depends(get_lead_repository),
+) -> LeadFileImportResponse:
+    filename = (file.filename or "leads.xlsx").strip()
+    payload = await file.read()
+    if len(payload) > 10 * 1024 * 1024:
+        raise HTTPException(status_code=400, detail="Lead-sheet uploads are limited to 10 MB.")
+    try:
+        parsed, detected = parse_lead_file(filename, payload)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not parsed:
+        raise HTTPException(status_code=400, detail="No importable leads were found in the file.")
+
+    name = " ".join((list_name or "").split()).strip() or Path(filename).stem.replace("_", " ").replace("-", " ").strip() or "Imported leads"
+    lead_list = repository.create_lead_list(current_user.uid, name[:120], None, len(parsed))
+    added_rows, duplicate_count, skipped_count = repository.import_parsed_leads(
+        current_user.uid, lead_list["id"], parsed
+    )
+    refreshed_list = repository.get_lead_list(current_user.uid, lead_list["id"])
+    return LeadFileImportResponse(
+        lead_list=LeadListResponse(**refreshed_list),
+        extracted_count=len(parsed),
+        added_count=len(added_rows),
+        duplicate_count=duplicate_count,
+        skipped_count=skipped_count,
+        detected_columns=detected,
         leads=[LeadResponse(**row) for row in added_rows],
     )
 

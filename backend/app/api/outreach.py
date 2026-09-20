@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
@@ -13,9 +15,10 @@ from app.outreach.gmail import GmailError, exchange_code, user_info
 from app.outreach.hostinger import HostingerMailError, choose_mailbox, get_mailboxes
 from app.outreach.oauth import authorization_url, make_state, verify_state
 from app.outreach.repository import OutreachNotFoundError, OutreachRepository
+from app.outreach.sending import send_with_sender
 from app.outreach.schemas import (
     CampaignCreate, CampaignCreateResponse, CampaignPreviewItem, CampaignResponse,
-    GmailAuthorizeResponse, HostingerConnectRequest, SenderResponse, SuppressionCreate, TemplateCreate, TemplateResponse,
+    GmailAuthorizeResponse, HostingerConnectRequest, QuickSendRequest, QuickSendResponse, SenderResponse, SuppressionCreate, TemplateCreate, TemplateResponse,
 )
 
 router = APIRouter(prefix="/api/v1/outreach", tags=["outreach"])
@@ -102,7 +105,7 @@ def campaigns(current_user: AuthenticatedUser=Depends(get_current_user),repo: Ou
 
 @router.post("/campaigns", response_model=CampaignCreateResponse)
 def create_campaign(data: CampaignCreate,current_user: AuthenticatedUser=Depends(get_current_user),repo: OutreachRepository=Depends(get_outreach_repository),lead_repo: LeadRepository=Depends(get_lead_repository)):
-    if data.send_end_hour == data.send_start_hour: raise HTTPException(400,"Sending window must have different start and end hours.")
+    if data.send_end_hour == data.send_start_hour and not (data.send_start_hour == 0 and data.send_end_hour == 24): raise HTTPException(400,"Sending window must have different start and end hours.")
     try:
         campaign,preview,suppressed,missing=repo.create_campaign(current_user.uid,data,lead_repo)
         return CampaignCreateResponse(campaign=_campaign(campaign),preview=[CampaignPreviewItem(**p) for p in preview],suppressed_count=suppressed,missing_email_count=missing)
@@ -132,6 +135,48 @@ def resume(campaign_id:str,current_user:AuthenticatedUser=Depends(get_current_us
 def cancel(campaign_id:str,current_user:AuthenticatedUser=Depends(get_current_user),repo:OutreachRepository=Depends(get_outreach_repository)):
     try:return _campaign(repo.set_campaign_status(current_user.uid,campaign_id,'cancelled'))
     except OutreachNotFoundError as exc: raise HTTPException(404,"Campaign not found.") from exc
+
+
+@router.post("/quick-send", response_model=QuickSendResponse)
+def quick_send(
+    data: QuickSendRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    repo: OutreachRepository = Depends(get_outreach_repository),
+):
+    to_email = data.to_email.strip().lower()
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", to_email):
+        raise HTTPException(400, "Enter a valid recipient email address.")
+    if repo.is_suppressed(current_user.uid, to_email):
+        raise HTTPException(400, "This address is on your suppression list.")
+    try:
+        sender = repo.get_sender(current_user.uid, data.sender_id)
+        provider_id = send_with_sender(
+            repo, user_id=current_user.uid, sender_id=data.sender_id,
+            to_email=to_email, subject=data.subject.strip(), body=data.body,
+        )
+        return QuickSendResponse(
+            sent=True, provider_message_id=provider_id,
+            sender_email=str(sender.get("email") or ""), to_email=to_email,
+        )
+    except (OutreachNotFoundError, ValueError) as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"The sender could not deliver this test email: {exc}") from exc
+
+
+@router.delete("/campaigns/{campaign_id}")
+def delete_campaign(
+    campaign_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    repo: OutreachRepository = Depends(get_outreach_repository),
+):
+    try:
+        repo.delete_campaign(current_user.uid, campaign_id)
+        return {"deleted": True}
+    except OutreachNotFoundError as exc:
+        raise HTTPException(404, "Campaign not found.") from exc
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 @router.post("/suppression")
 def suppress(data:SuppressionCreate,current_user:AuthenticatedUser=Depends(get_current_user),repo:OutreachRepository=Depends(get_outreach_repository)):

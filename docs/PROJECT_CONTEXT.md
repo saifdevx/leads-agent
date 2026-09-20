@@ -1,53 +1,57 @@
-# Lead Platform — Current Handoff
+# Leads Agent Project Context
 
-## Completed
+## Product
+Custom React/FastAPI lead-generation and outreach web app. Keep the normal UX simple: Find Leads, My Leads, Outreach, Settings.
 
-- React/FastAPI foundation
-- Firebase authentication
-- Turso persistence
-- Automated Serper/Brave lead discovery
-- Website crawling and quality filtering
+## Stack
+- React + Vite + TypeScript + Tailwind CSS
+- FastAPI/Python
+- Firebase Auth
+- Turso SQL-over-HTTP
+- Serper/Brave search adapters
 - Gemini/OpenAI BYOK
-- Prospeo/Apollo enrichment BYOK
-- Excel/CSV export
-- Email templates
-- Hostinger Agentic Mail sender connection (recommended)
-- Optional Gmail OAuth sender connection
-- Campaign preview + explicit approval
-- Persistent email queue
-- Daily limits, sending windows, minimum interval
-- Pause/resume/cancel
-- Suppression filtering
-- Separate email worker
-- Basic campaign metrics
+- Prospeo/Apollo enrichment
+- Hostinger Agentic Mail primary sender
+- Gmail optional sender
 
-## UX philosophy
+## Current working flow
+1. User signs in.
+2. Finds leads automatically or imports Excel/CSV.
+3. Reviews, filters, enriches and exports leads.
+4. Selects leads for Outreach.
+5. Creates/edits templates.
+6. Connects Hostinger/Gmail sender.
+7. Creates campaign, previews and approves.
+8. Worker sends using daily limit, optional time window and configurable interval.
+9. Quick Send allows one-off manual/testing messages.
 
-Keep the user experience centered on:
+## Important local paths
+Repo: `D:\Leads-Agent\leads-agent`
+Firebase admin secret: outside repo under `D:\Leads-Agent\secrets\`
 
-`Find leads → review leads → contact leads`
+## Secrets
+Never commit `.env`, Firebase JSON, Turso tokens, provider API keys or Hostinger tokens. Never regenerate `CREDENTIAL_ENCRYPTION_KEY` after credentials have been stored.
 
-Do not expose infrastructure concepts unnecessarily.
+## Git preference
+User prefers normal professional commit messages and does not want public checkpoint/version tags.
 
-## Current sender direction
+## Latest update
+- Quick Send
+- Excel/CSV upload
+- optional sending window
+- 20s minimum campaign interval / 30s default
+- campaign auto/manual refresh
+- progress display
+- campaign delete for non-sending campaigns
 
-Hostinger Agentic Mail is now the recommended sender because it uses a simple API token and exposes a full mailbox API. User tokens are validated through `GET /api/v1/me`, the allowed mailbox is discovered, and the token is encrypted in Turso using `CREDENTIAL_ENCRYPTION_KEY`.
-
-Gmail remains optional and may be configured later.
-
-## Next combined bundle after one real Hostinger send is validated
-
-Do not split these into tiny checkpoints unless debugging requires it:
-
-- Hostinger incoming-message webhook integration after a public HTTPS backend exists
-- reply detection and automatic stop-on-reply
-- multi-step follow-ups
-- unsubscribe/opt-out workflow improvements
+## Next major product work after this passes
+Combine:
+- Hostinger reply webhook / reply sync
+- stop-on-reply
+- multi-step follow-up sequences
+- reply inbox
 - campaign analytics
-- admin overview/users/usage/system
-- production deployment hardening
-- final UX polish
+- basic admin/usage/system dashboard
+- production worker deployment / final performance and UX hardening
 
-## Important
-
-Hostinger webhooks require a publicly accessible HTTPS endpoint. Local development should prove the send path first. After deployment, use Hostinger `message.received` webhooks for real-time reply handling instead of polling where possible.
+Do not redesign completed Firebase, Turso, discovery, enrichment, export or sender systems from scratch.

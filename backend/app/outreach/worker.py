@@ -8,6 +8,7 @@ from app.core.config import get_settings
 from app.outreach.dependencies import get_outreach_repository
 from app.outreach.gmail import GmailError, refresh_access_token, send_message as send_gmail_message
 from app.outreach.hostinger import HostingerMailError, send_message as send_hostinger_message
+from app.outreach.sending import send_with_sender
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -58,7 +59,7 @@ def _can_send_now(message: dict, repository, now_utc: datetime) -> tuple[bool, d
         return False, _next_window_start(now_utc, str(message.get("timezone") or "UTC"), start)
 
     last = _parse_iso(repository.last_sent_at(message["sender_id"]))
-    min_interval = int(message.get("min_interval_seconds") or 60)
+    min_interval = int(message.get("min_interval_seconds") or 30)
     if last and (now_utc - last.astimezone(timezone.utc)).total_seconds() < min_interval:
         return False, last.astimezone(timezone.utc) + timedelta(seconds=min_interval)
     return True, None
@@ -94,33 +95,14 @@ def process_once() -> int:
         if not repository.claim_message(message["id"]):
             continue
         try:
-            sender = repository.get_sender(message["user_id"], message["sender_id"], with_credentials=True)
-            provider = str(sender.get("provider") or "gmail").lower()
-            if provider == "hostinger":
-                credentials = sender["credentials"]
-                api_token = str(credentials.get("api_token") or "")
-                mailbox_resource_id = str(credentials.get("mailbox_resource_id") or "")
-                if not api_token or not mailbox_resource_id:
-                    raise HostingerMailError("Reconnect this Hostinger sender. Its mailbox credentials are incomplete.")
-                provider_id = send_hostinger_message(
-                    api_token=api_token,
-                    mailbox_resource_id=mailbox_resource_id,
-                    to_email=message["to_email"],
-                    subject=message["subject"],
-                    body=message["body"],
-                    display_name=sender.get("display_name"),
-                )
-            elif provider == "gmail":
-                credentials = _ensure_access_token(repository, message["user_id"], message["sender_id"], sender["credentials"])
-                provider_id = send_gmail_message(
-                    access_token=credentials["access_token"],
-                    sender_email=sender["email"],
-                    to_email=message["to_email"],
-                    subject=message["subject"],
-                    body=message["body"],
-                )
-            else:
-                raise RuntimeError(f"Unsupported sender provider: {provider}")
+            provider_id = send_with_sender(
+                repository,
+                user_id=message["user_id"],
+                sender_id=message["sender_id"],
+                to_email=message["to_email"],
+                subject=message["subject"],
+                body=message["body"],
+            )
             repository.mark_sent(message["id"], provider_id)
         except Exception as exc:
             # Fail safe. We deliberately do not automatically retry an uncertain send,
@@ -143,7 +125,7 @@ def main() -> None:
             break
         except Exception as exc:
             print(f"Worker iteration failed: {exc}")
-        time.sleep(10)
+        time.sleep(5)
 
 
 if __name__ == "__main__":

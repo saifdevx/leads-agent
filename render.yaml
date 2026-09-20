@@ -37,7 +37,7 @@ services:
       - key: APP_ENV
         value: production
       - key: APP_VERSION
-        value: 0.7.0
+        value: 0.9.0
       - key: CORS_ORIGINS
         sync: false
       - key: LOG_LEVEL

@@ -43,3 +43,18 @@ def test_hostinger_sender_credentials_are_encrypted_and_read_back():
     stored=repo.get_sender('u',sender['id'],with_credentials=True)
     assert stored['credentials']['api_token']=='secret-token'
     assert stored['credentials']['mailbox_resource_id']=='AC123'
+
+
+def test_campaign_can_be_deleted_when_not_sending():
+    repo=OutreachRepository(SqliteAdapter(), CredentialCipher(Fernet.generate_key().decode()))
+    template=repo.save_template('u',TemplateCreate(name='Intro',category='General',subject='Hi',body='Hello'))
+    sender=repo.save_gmail_sender('u','sender@example.com','Sender',{'access_token':'a','refresh_token':'r','expires_at':'2099-01-01T00:00:00+00:00'})
+    campaign,_,_,_=repo.create_campaign('u',CampaignCreate(name='Delete me',lead_ids=['lead-1'],template_id=template['id'],sender_id=sender['id']),Leads())
+    repo.delete_campaign('u', campaign['id'])
+    assert repo.list_campaigns('u') == []
+
+
+def test_suppression_lookup_is_case_insensitive():
+    repo=OutreachRepository(SqliteAdapter(), CredentialCipher(Fernet.generate_key().decode()))
+    repo.suppress('u','Person@Example.com','manual')
+    assert repo.is_suppressed('u','person@example.com') is True

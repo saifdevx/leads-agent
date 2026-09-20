@@ -39,7 +39,7 @@ class CampaignCreate(BaseModel):
     send_start_hour: int = Field(default=9, ge=0, le=23)
     send_end_hour: int = Field(default=17, ge=1, le=24)
     timezone: str = Field(default="UTC", min_length=1, max_length=80)
-    min_interval_seconds: int = Field(default=60, ge=30, le=3600)
+    min_interval_seconds: int = Field(default=30, ge=20, le=3600)
 
 class CampaignPreviewItem(BaseModel):
     lead_id: str
@@ -76,3 +76,17 @@ class CampaignCreateResponse(BaseModel):
 class SuppressionCreate(BaseModel):
     email: str = Field(min_length=3, max_length=320)
     reason: str = Field(default="manual", max_length=120)
+
+
+class QuickSendRequest(BaseModel):
+    sender_id: str = Field(min_length=1, max_length=120)
+    to_email: str = Field(min_length=3, max_length=320)
+    subject: str = Field(min_length=1, max_length=300)
+    body: str = Field(min_length=1, max_length=20_000)
+
+
+class QuickSendResponse(BaseModel):
+    sent: bool
+    provider_message_id: str
+    sender_email: str
+    to_email: str
