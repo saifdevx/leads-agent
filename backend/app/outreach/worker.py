@@ -48,8 +48,10 @@ def _day_bounds(now_utc: datetime, timezone_name: str) -> tuple[str, str]:
 def _can_send_now(message: dict, repository, now_utc: datetime) -> tuple[bool, datetime | None]:
     zone = _zone(str(message.get("timezone") or "UTC"))
     local = now_utc.astimezone(zone)
-    start = int(message.get("send_start_hour") or 9)
-    end = int(message.get("send_end_hour") or 17)
+    start_raw = message.get("send_start_hour")
+    end_raw = message.get("send_end_hour")
+    start = int(9 if start_raw is None else start_raw)
+    end = int(17 if end_raw is None else end_raw)
     in_window = start <= local.hour < end if end > start else (local.hour >= start or local.hour < end)
     if not in_window:
         return False, _next_window_start(now_utc, str(message.get("timezone") or "UTC"), start)

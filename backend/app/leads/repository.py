@@ -273,6 +273,19 @@ class LeadRepository:
             "updated_at": now,
         }
 
+
+    def delete_leads(self, user_id: str, lead_ids: list[str]) -> int:
+        clean_ids = list(dict.fromkeys(lead_id for lead_id in lead_ids if lead_id))[:500]
+        if not clean_ids:
+            return 0
+        placeholders = ",".join("?" for _ in clean_ids)
+        result = self.database.execute(
+            f"DELETE FROM leads WHERE user_id=? AND id IN ({placeholders})",
+            (user_id, *clean_ids),
+            want_rows=False,
+        )
+        return result.affected_row_count
+
     def import_parsed_leads(self, user_id: str, list_id: str, leads: list[ParsedLead]) -> tuple[list[dict], int, int]:
         lead_list = self.get_lead_list(user_id, list_id)
         existing_rows = self.database.execute(

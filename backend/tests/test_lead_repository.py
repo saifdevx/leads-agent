@@ -118,3 +118,26 @@ def test_import_merges_better_data_into_existing_business_by_domain():
     assert params[0] == "Example Wash Co"
     assert params[6] == "hello@examplewash.com"
     assert params[8] == "+1 214 555 0198"
+
+
+class DeleteDatabase(FakeDatabase):
+    def execute(self, sql, params=(), *, want_rows=True):
+        self.calls.append((sql, params, want_rows))
+        if sql.lstrip().startswith("DELETE FROM leads"):
+            return QueryResult([], [], 2, None, 0, 2)
+        return super().execute(sql, params, want_rows=want_rows)
+
+
+def test_delete_leads_scopes_delete_to_user_and_deduplicates_ids():
+    db = DeleteDatabase()
+    repository = LeadRepository(db)
+
+    deleted = repository.delete_leads("firebase-1", ["lead-1", "lead-1", "lead-2"])
+
+    assert deleted == 2
+    delete_calls = [call for call in db.calls if call[0].lstrip().startswith("DELETE FROM leads")]
+    assert len(delete_calls) == 1
+    sql, params, want_rows = delete_calls[0]
+    assert "user_id=?" in sql
+    assert params == ("firebase-1", "lead-1", "lead-2")
+    assert want_rows is False

@@ -2,6 +2,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, BackgroundTasks, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.responses import Response
+from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user
 from app.auth.schemas import AuthenticatedUser
@@ -319,3 +320,16 @@ def export_leads(
         media_type=media_type,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+class LeadDeleteRequest(BaseModel):
+    lead_ids: list[str] = Field(min_length=1, max_length=500)
+
+@router.post("/leads/delete")
+def delete_leads(
+    request: LeadDeleteRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    repository: LeadRepository = Depends(get_lead_repository),
+):
+    deleted = repository.delete_leads(current_user.uid, request.lead_ids)
+    return {"deleted_count": deleted}

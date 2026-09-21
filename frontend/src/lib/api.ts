@@ -77,6 +77,25 @@ type ErrorPayload = {
 
 const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replace(/\/$/, '')
 
+type CacheEntry = { expiresAt: number; value: unknown }
+const responseCache = new Map<string, CacheEntry>()
+
+export function invalidateApiCache(prefix = '') {
+  for (const key of responseCache.keys()) {
+    const path = key.includes('|') ? key.slice(key.indexOf('|') + 1) : key
+    if (!prefix || path.startsWith(prefix)) responseCache.delete(key)
+  }
+}
+
+async function cachedAuthRequest<T>(path: string, idToken: string, ttlMs = 8000, force = false): Promise<T> {
+  const key = `${idToken.slice(-24)}|${path}`
+  const cached = responseCache.get(key)
+  if (!force && cached && cached.expiresAt > Date.now()) return cached.value as T
+  const value = await authRequest<T>(path, idToken)
+  responseCache.set(key, { expiresAt: Date.now() + ttlMs, value })
+  return value
+}
+
 export class ApiRequestError extends Error {
   status: number
   requestId?: string | null
@@ -155,13 +174,13 @@ export async function importLeadText(
   })
 }
 
-export async function getLeadLists(idToken: string): Promise<LeadList[]> {
-  return authRequest<LeadList[]>('/api/v1/lead-lists', idToken)
+export async function getLeadLists(idToken: string, force = false): Promise<LeadList[]> {
+  return cachedAuthRequest<LeadList[]>('/api/v1/lead-lists', idToken, 8000, force)
 }
 
-export async function getLeads(idToken: string, listId?: string): Promise<Lead[]> {
+export async function getLeads(idToken: string, listId?: string, force = false): Promise<Lead[]> {
   const query = listId ? `?list_id=${encodeURIComponent(listId)}` : ''
-  return authRequest<Lead[]>(`/api/v1/leads${query}`, idToken)
+  return cachedAuthRequest<Lead[]>(`/api/v1/leads${query}`, idToken, 7000, force)
 }
 
 export type LeadFileImportResult = {
@@ -370,6 +389,11 @@ export type Campaign = {
   sent_count: number
   failed_count: number
   skipped_count: number
+  stop_on_reply: boolean
+  replied_count: number
+  interested_count: number
+  unsubscribed_count: number
+  out_of_office_count: number
   approved_at: string | null
   created_at: string
   updated_at: string
@@ -383,19 +407,22 @@ export type CampaignCreateResult = {
   missing_email_count: number
 }
 
-export async function getTemplates(idToken: string): Promise<EmailTemplate[]> {
-  return authRequest<EmailTemplate[]>('/api/v1/outreach/templates', idToken)
+export async function getTemplates(idToken: string, force = false): Promise<EmailTemplate[]> {
+  return cachedAuthRequest<EmailTemplate[]>('/api/v1/outreach/templates', idToken, 10000, force)
 }
 export async function saveTemplate(idToken: string, input: { name: string; category: string; subject: string; body: string }, templateId?: string): Promise<EmailTemplate> {
-  return authRequest<EmailTemplate>(templateId ? `/api/v1/outreach/templates/${encodeURIComponent(templateId)}` : '/api/v1/outreach/templates', idToken, {
+  const value = await authRequest<EmailTemplate>(templateId ? `/api/v1/outreach/templates/${encodeURIComponent(templateId)}` : '/api/v1/outreach/templates', idToken, {
     method: templateId ? 'PUT' : 'POST', body: JSON.stringify(input),
   })
+  invalidateApiCache('/api/v1/outreach/templates')
+  return value
 }
 export async function deleteTemplate(idToken: string, templateId: string): Promise<void> {
   await authRequest(`/api/v1/outreach/templates/${encodeURIComponent(templateId)}`, idToken, { method: 'DELETE' })
+  invalidateApiCache('/api/v1/outreach/templates')
 }
-export async function getSenders(idToken: string): Promise<SenderConnection[]> {
-  return authRequest<SenderConnection[]>('/api/v1/outreach/senders', idToken)
+export async function getSenders(idToken: string, force = false): Promise<SenderConnection[]> {
+  return cachedAuthRequest<SenderConnection[]>('/api/v1/outreach/senders', idToken, 10000, force)
 }
 export async function getGmailAuthorizeUrl(idToken: string): Promise<string> {
   const result = await authRequest<{ authorization_url: string }>('/api/v1/outreach/gmail/authorize-url', idToken)
@@ -405,25 +432,33 @@ export async function connectHostingerSender(
   idToken: string,
   input: { api_token: string; mailbox_email?: string; display_name?: string },
 ): Promise<SenderConnection> {
-  return authRequest<SenderConnection>('/api/v1/outreach/hostinger/connect', idToken, {
+  const value = await authRequest<SenderConnection>('/api/v1/outreach/hostinger/connect', idToken, {
     method: 'POST',
     body: JSON.stringify(input),
   })
+  invalidateApiCache('/api/v1/outreach/senders')
+  return value
 }
 export async function disconnectSender(idToken: string, senderId: string): Promise<void> {
   await authRequest(`/api/v1/outreach/senders/${encodeURIComponent(senderId)}`, idToken, { method: 'DELETE' })
+  invalidateApiCache('/api/v1/outreach/senders')
 }
-export async function getCampaigns(idToken: string): Promise<Campaign[]> {
-  return authRequest<Campaign[]>('/api/v1/outreach/campaigns', idToken)
+export async function getCampaigns(idToken: string, force = false): Promise<Campaign[]> {
+  return cachedAuthRequest<Campaign[]>('/api/v1/outreach/campaigns', idToken, 6000, force)
 }
 export async function createCampaign(idToken: string, input: {
   name: string; lead_ids: string[]; template_id: string; sender_id: string; daily_limit: number;
-  send_start_hour: number; send_end_hour: number; timezone: string; min_interval_seconds: number;
+  send_start_hour: number; send_end_hour: number; timezone: string; min_interval_seconds: number; stop_on_reply?: boolean;
+  follow_ups?: { template_id: string; delay_hours: number }[];
 }): Promise<CampaignCreateResult> {
-  return authRequest<CampaignCreateResult>('/api/v1/outreach/campaigns', idToken, { method: 'POST', body: JSON.stringify(input) })
+  const value = await authRequest<CampaignCreateResult>('/api/v1/outreach/campaigns', idToken, { method: 'POST', body: JSON.stringify(input) })
+  invalidateApiCache('/api/v1/outreach/campaigns')
+  return value
 }
 export async function campaignAction(idToken: string, campaignId: string, action: 'approve'|'pause'|'resume'|'cancel'): Promise<Campaign> {
-  return authRequest<Campaign>(`/api/v1/outreach/campaigns/${encodeURIComponent(campaignId)}/${action}`, idToken, { method: 'POST' })
+  const value = await authRequest<Campaign>(`/api/v1/outreach/campaigns/${encodeURIComponent(campaignId)}/${action}`, idToken, { method: 'POST' })
+  invalidateApiCache('/api/v1/outreach')
+  return value
 }
 export async function suppressEmail(idToken: string, email: string, reason = 'manual'): Promise<void> {
   await authRequest('/api/v1/outreach/suppression', idToken, { method: 'POST', body: JSON.stringify({ email, reason }) })
@@ -437,4 +472,43 @@ export async function quickSend(idToken: string, input: { sender_id: string; to_
 
 export async function deleteCampaign(idToken: string, campaignId: string): Promise<void> {
   await authRequest(`/api/v1/outreach/campaigns/${encodeURIComponent(campaignId)}`, idToken, { method: 'DELETE' })
+  invalidateApiCache('/api/v1/outreach')
+}
+
+
+export type CampaignStep = { id: string; step_number: number; template_id: string; template_name: string | null; delay_hours: number }
+export type CampaignMessage = {
+  id: string; lead_id: string; company_name: string | null; contact_name: string | null; to_email: string;
+  step_number: number; message_kind: string; subject: string; status: string; scheduled_at: string | null;
+  sent_at: string | null; replied_at: string | null; last_error: string | null;
+}
+export type OutreachReply = {
+  id: string; campaign_id: string | null; campaign_name: string | null; lead_id: string | null; company_name: string | null;
+  from_email: string; to_email: string | null; subject: string | null; snippet: string | null; body_text: string | null;
+  classification: 'reply' | 'interested' | 'not_interested' | 'unsubscribe' | 'out_of_office' | string; received_at: string;
+}
+export type CampaignDetail = {
+  campaign: Campaign; steps: CampaignStep[]; messages: CampaignMessage[]; replies: OutreachReply[]; followups_sent: number; reply_rate: number;
+}
+
+export async function getCampaignDetail(idToken: string, campaignId: string, force = false): Promise<CampaignDetail> {
+  return cachedAuthRequest<CampaignDetail>(`/api/v1/outreach/campaigns/${encodeURIComponent(campaignId)}`, idToken, 5000, force)
+}
+export async function getReplies(idToken: string, force = false): Promise<OutreachReply[]> {
+  return cachedAuthRequest<OutreachReply[]>('/api/v1/outreach/replies', idToken, 5000, force)
+}
+export async function syncSenderReplies(idToken: string, senderId: string): Promise<{ checked_count: number; matched_count: number; new_replies: number }> {
+  const result = await authRequest<{ checked_count: number; matched_count: number; new_replies: number }>(`/api/v1/outreach/senders/${encodeURIComponent(senderId)}/sync-replies`, idToken, { method: 'POST' })
+  invalidateApiCache('/api/v1/outreach')
+  return result
+}
+export async function retryCampaignMessage(idToken: string, campaignId: string, messageId: string): Promise<void> {
+  await authRequest(`/api/v1/outreach/campaigns/${encodeURIComponent(campaignId)}/messages/${encodeURIComponent(messageId)}/retry`, idToken, { method: 'POST' })
+  invalidateApiCache('/api/v1/outreach')
+}
+export async function deleteLeads(idToken: string, leadIds: string[]): Promise<number> {
+  const result = await authRequest<{ deleted_count: number }>('/api/v1/leads/delete', idToken, { method: 'POST', body: JSON.stringify({ lead_ids: leadIds }) })
+  invalidateApiCache('/api/v1/leads')
+  invalidateApiCache('/api/v1/lead-lists')
+  return result.deleted_count
 }

@@ -1,20 +1,35 @@
-Lead Platform — Productivity & Outreach Update
+LEAD PLATFORM — REPLIES / FOLLOW-UPS / ANALYTICS BUNDLE
 
-Major additions:
-- Quick Send
-- Excel/CSV lead import
-- Optional campaign sending windows
-- 20/30/45/60/90/120 second intervals
-- Outreach auto/manual refresh
-- Campaign progress bars
-- Campaign cleanup/delete
-- Worker polling every 5 seconds
+PURPOSE
+- Add reply handling, follow-up automation, campaign analytics and faster UI interactions.
 
-New dependencies:
-- openpyxl==3.1.5
-- python-multipart==0.0.20
+ADD / MAJOR CHANGES
+- backend/migrations/003_replies_followups.sql
+- backend reply/follow-up repository and API support
+- Hostinger inbox sync + webhook-ready receiver
+- frontend Reply Inbox + campaign detail drawer
+- frontend optimistic actions + response cache
+- bulk lead deletion
+- subtle motion styles
 
-Database migration:
-- None
+KEEP / DO NOT REPLACE WITH SECRETS
+- .git/
+- backend/.env
+- backend/.venv/
+- frontend/.env
+- local frontend/node_modules/
+- CREDENTIAL_ENCRYPTION_KEY value
+- Firebase Admin private JSON
 
-Keep local secrets and CREDENTIAL_ENCRYPTION_KEY unchanged.
+DATABASE
+- Run `python -m app.db.migrate` once after update.
+- Expected new migration: 003_replies_followups.
+
+TEST
+- Backend: pytest -q
+- Frontend: npm run check && npm run test && npm run build
+- Then test one controlled send + reply sync + stop-on-reply.
+
+ROLLBACK
+- Keep the previous Git commit before copying this bundle.
+- Because migration 003 restructures email_messages, take a Turso backup/branch before applying it to important production data.

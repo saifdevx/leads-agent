@@ -2,7 +2,7 @@
 
 A custom lead-generation and outreach web app built around a simple workflow:
 
-**Find leads -> review/enrich/import/export -> outreach**
+**Find leads → review/enrich/import/export → outreach → replies/follow-ups**
 
 ## Current capabilities
 
@@ -12,18 +12,24 @@ A custom lead-generation and outreach web app built around a simple workflow:
 - Public website research
 - Gemini/OpenAI BYOK cleanup
 - Prospeo/Apollo BYOK enrichment
-- Excel/CSV export
-- Excel/CSV lead-sheet import
+- Excel/CSV import and export
 - Email templates
 - Hostinger Mail sender
 - Optional Gmail sender
-- Campaign preview/approval
+- Campaign preview + explicit approval
 - Persistent email queue + worker
-- Daily limits and configurable 20s+ send interval
-- Optional sending-hour window
-- Quick Send for one-off/testing email
+- Quick Send
+- Daily limits, configurable 20s+ interval, optional sending window
 - Pause/resume/cancel/delete campaign controls
 - Suppression list
+- Multi-step follow-up sequences
+- Reply Inbox + manual Hostinger reply sync for local development
+- Stop-on-reply
+- Interested / unsubscribe / out-of-office reply classification
+- Campaign reply analytics and message-level retry controls
+- Optimistic UI for common actions + short-lived frontend response cache
+- Bulk lead deletion with instant UI feedback
+- Subtle UI motion with reduced-motion support
 
 ## Local processes
 
@@ -47,4 +53,4 @@ cd backend
 python -m app.outreach.worker
 ```
 
-See `docs/PRODUCTIVITY_SETUP.md` for the latest update instructions.
+See `docs/REPLIES_FOLLOWUPS_SETUP.md` for this bundle's update and test guide.

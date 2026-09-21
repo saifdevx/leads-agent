@@ -126,3 +126,57 @@ def send_message(
         raise HostingerMailError(_human_error(response, f"Hostinger Mail send failed with status {response.status_code}."))
 
     return f"hostinger:{mailbox_resource_id}"
+
+
+def list_inbox_messages(api_token: str, mailbox_resource_id: str, *, per_page: int = 50) -> list[dict]:
+    """Return recent INBOX messages for local reply sync/testing."""
+    try:
+        response = httpx.get(
+            f"{BASE_URL}/api/v1/mailboxes/{mailbox_resource_id}/folders/INBOX/messages",
+            headers=_headers(api_token),
+            params={"page": 1, "perPage": max(1, min(per_page, 100)), "sort": "-uid"},
+            timeout=20,
+        )
+    except httpx.HTTPError as exc:
+        raise HostingerMailError("Could not reach the Hostinger inbox API.") from exc
+    if not response.is_success:
+        raise HostingerMailError(_human_error(response, "Could not read the Hostinger inbox."))
+    payload = response.json()
+    return list(payload.get("data") or [])
+
+
+def get_message_text(api_token: str, mailbox_resource_id: str, uid: int) -> str:
+    try:
+        response = httpx.get(
+            f"{BASE_URL}/api/v1/mailboxes/{mailbox_resource_id}/folders/INBOX/messages/{uid}/text",
+            headers=_headers(api_token),
+            timeout=20,
+        )
+    except httpx.HTTPError as exc:
+        raise HostingerMailError("Could not read the Hostinger message body.") from exc
+    if not response.is_success:
+        return ""
+    data = (response.json().get("data") or {})
+    return str(data.get("text") or "").strip()
+
+
+def create_webhook(api_token: str, mailbox_resource_id: str, url: str) -> dict:
+    """Create a Hostinger message.received webhook and return its one-time secret."""
+    try:
+        response = httpx.post(
+            f"{BASE_URL}/api/v1/mailboxes/{mailbox_resource_id}/webhooks",
+            headers=_headers(api_token),
+            json={
+                "name": "Lead Platform replies",
+                "description": "Stop follow-ups and sync replies into Lead Platform",
+                "events": ["message.received"],
+                "status": "active",
+                "url": url,
+            },
+            timeout=20,
+        )
+    except httpx.HTTPError as exc:
+        raise HostingerMailError("Could not create the Hostinger webhook.") from exc
+    if response.status_code != 201:
+        raise HostingerMailError(_human_error(response, "Hostinger could not create the webhook."))
+    return dict(response.json().get("data") or {})

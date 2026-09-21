@@ -1,17 +1,22 @@
 # Changelog
 
-## Productivity & Outreach update
+## Replies, follow-ups, analytics & responsiveness update
 
-- Added Quick Send for one-off/testing emails.
-- Added Excel (.xlsx) and CSV lead-sheet import from My Leads.
-- Added automatic header mapping for common lead columns.
-- Added optional campaign sending windows. When disabled, approved campaigns can begin immediately.
-- Reduced supported campaign interval to 20 seconds minimum; default is now 30 seconds.
-- Added 20/30/45/60/90/120 second interval choices.
-- Added automatic Outreach refresh while campaigns are sending plus a manual Refresh button.
-- Added campaign progress bars and clearer schedule/interval details.
-- Added campaign deletion for non-sending campaigns so test campaigns can be cleaned up.
-- Added suppression enforcement to Quick Send.
-- Worker now checks the queue every 5 seconds for more responsive testing.
-- Added lead-file import tests, all-day campaign tests, campaign-delete tests, suppression tests and sender-service tests.
-- No existing Turso migration is required for this update.
+- Added campaign follow-up sequences using separate templates and configurable delays.
+- Added stop-on-reply, enabled by default for new campaigns.
+- Added Hostinger reply synchronization for local development.
+- Added webhook-ready Hostinger `message.received` support for production HTTPS deployment.
+- Added Reply Inbox with classifications: interested, reply, not interested, unsubscribe, and out of office.
+- Unsubscribe replies now add the sender address to the suppression list automatically.
+- Future queued/waiting messages are cancelled when stop-on-reply is enabled.
+- Added campaign detail drawer with sequence steps, per-message status, replies, reply rate, and follow-up counts.
+- Added safe manual retry for failed messages.
+- Added campaign reply analytics cards and per-campaign reply counts.
+- Added optimistic campaign pause/resume/cancel/delete so controls respond immediately instead of waiting on Turso round trips.
+- Added optimistic bulk lead deletion with rollback on backend failure.
+- Added short-lived authenticated frontend response caching for leads, lead lists, templates, senders, campaigns, details, and replies.
+- Mutations invalidate relevant caches automatically.
+- Added subtle page/card/row/drawer/button animations with `prefers-reduced-motion` support.
+- Added migration `003_replies_followups`.
+- Fixed the all-day sending window so `0 → 24` truly allows sending at all hours.
+- Added regression coverage for follow-up scheduling, stop-on-reply, unsubscribe suppression, duplicate replies, unique campaign reply counts, all-day sending, and scoped bulk lead deletion.

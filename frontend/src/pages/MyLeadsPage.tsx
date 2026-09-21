@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../components/Icon'
 import {
   ApiRequestError,
+  deleteLeads,
   downloadLeadExport,
   getJob,
   getLeadLists,
@@ -49,6 +50,7 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
   const [enrichProvider, setEnrichProvider] = useState<EnrichmentProvider>('auto')
   const [targetTitles, setTargetTitles] = useState(DEFAULT_TITLES)
   const [importingFile, setImportingFile] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   useEffect(() => {
@@ -57,8 +59,8 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
     setError(null)
     getToken()
       .then(async (token) => Promise.all([
-        getLeadLists(token),
-        getLeads(token, selectedList === 'all' ? undefined : selectedList),
+        getLeadLists(token, refreshKey > 0),
+        getLeads(token, selectedList === 'all' ? undefined : selectedList, refreshKey > 0),
       ]))
       .then(([nextLists, nextLeads]) => {
         if (!active) return
@@ -211,6 +213,30 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
     }
   }
 
+
+  async function deleteSelectedLeads() {
+    if (!selectedCount || !window.confirm(`Delete ${selectedCount} selected lead${selectedCount === 1 ? '' : 's'}? This cannot be undone.`)) return
+    const ids = [...selectedIds]
+    const previous = leads
+    setDeleting(true)
+    setError(null)
+    setNotice(null)
+    setLeads((current) => current.filter((lead) => !selectedIds.has(lead.id)))
+    setSelectedIds(new Set())
+    try {
+      const token = await getToken()
+      const deleted = await deleteLeads(token, ids)
+      setNotice(`Deleted ${deleted} lead${deleted === 1 ? '' : 's'}.`)
+      setLists((current) => current.map((list) => ({ ...list, lead_count: Math.max(0, list.lead_count - ids.filter((id) => previous.find((lead) => lead.id === id && lead.list_id === list.id)).length) })))
+    } catch (nextError) {
+      setLeads(previous)
+      setSelectedIds(new Set(ids))
+      setError(nextError instanceof ApiRequestError ? nextError.message : 'Could not delete the selected leads.')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
   return (
     <div className="space-y-5">
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -220,7 +246,7 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
           ['Verified email', stats.verified, 'Ready for outreach'],
           ['High fit', stats.highScore, 'Score 85+'],
         ].map(([label, value, helper]) => (
-          <div key={String(label)} className="card-surface rounded-[12px] px-5 py-4">
+          <div key={String(label)} className="card-surface motion-card rounded-[12px] px-5 py-4">
             <div className="text-xs font-bold uppercase tracking-[0.07em] text-[#858894]">{label}</div>
             <div className="mt-1 font-display text-2xl font-bold text-[#1F2128]">{value}</div>
             <div className="mt-1 text-xs text-[#8A8D97]">{helper}</div>
@@ -255,6 +281,14 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
                 className="focus-ring inline-flex h-10 items-center gap-2 rounded-[9px] border border-[#D9D4F7] bg-[#F7F5FF] px-3.5 text-sm font-bold text-[#6B54D7] hover:bg-[#F0EDFF] disabled:cursor-not-allowed disabled:opacity-40"
               >
                 <Icon name="mail" className="h-4 w-4" /> Outreach{selectedCount ? ` ${selectedCount}` : ''}
+              </button>
+              <button
+                type="button"
+                disabled={!selectedCount || deleting}
+                onClick={() => void deleteSelectedLeads()}
+                className="button-pop focus-ring inline-flex h-10 items-center gap-2 rounded-[9px] border border-[#F0CBC8] bg-white px-3.5 text-sm font-bold text-[#9D3D36] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {deleting ? 'Deleting…' : `Delete${selectedCount ? ` ${selectedCount}` : ''}`}
               </button>
               <button
                 type="button"
@@ -340,7 +374,7 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
                   const verified = lead.email && (lead.email_status || '').toLowerCase() === 'verified'
                   const contactName = [lead.first_name, lead.last_name].filter(Boolean).join(' ')
                   return (
-                    <tr key={lead.id} className="bg-white text-sm hover:bg-[#FCFCFD]">
+                    <tr key={lead.id} className="motion-row bg-white text-sm hover:bg-[#FCFCFD]">
                       <td className="px-5 py-4"><input aria-label={`Select ${lead.company_name || lead.domain || 'lead'}`} type="checkbox" checked={selectedIds.has(lead.id)} onChange={() => toggleLead(lead.id)} /></td>
                       <td className="px-3 py-4">
                         <div className="font-semibold text-[#2D3038]">{lead.company_name || lead.domain || 'Unknown business'}</div>
