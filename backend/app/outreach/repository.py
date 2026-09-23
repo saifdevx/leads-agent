@@ -64,12 +64,12 @@ class OutreachRepository:
     # Senders
     def list_senders(self, user_id):
         return self.database.execute(
-            "SELECT id,provider,email,display_name,status,last_error,created_at,updated_at FROM sender_connections WHERE user_id=? ORDER BY updated_at DESC",
+            "SELECT id,provider,email,display_name,status,last_error,webhook_status,webhook_url,created_at,updated_at FROM sender_connections WHERE user_id=? ORDER BY updated_at DESC",
             (user_id,),
         ).rows
 
     def get_sender(self, user_id, sender_id, with_credentials=False):
-        cols = "id,provider,email,display_name,status,last_error,created_at,updated_at" + (
+        cols = "id,provider,email,display_name,status,last_error,webhook_status,webhook_url,created_at,updated_at" + (
             ",credentials_ciphertext" if with_credentials else ""
         )
         rows = self.database.execute(
@@ -119,6 +119,15 @@ class OutreachRepository:
             want_rows=False,
         )
 
+
+    def mark_sender_webhook(self, user_id, sender_id, *, status, url=None):
+        self.database.execute(
+            "UPDATE sender_connections SET webhook_status=?,webhook_url=?,updated_at=? WHERE user_id=? AND id=?",
+            (status, url, now(), user_id, sender_id),
+            want_rows=False,
+        )
+        return self.get_sender(user_id, sender_id)
+
     def sender_error(self, user_id, sender_id, message):
         self.database.execute(
             "UPDATE sender_connections SET last_error=?,updated_at=? WHERE user_id=? AND id=?",
@@ -163,6 +172,26 @@ class OutreachRepository:
             (user_id, value),
         ).rows
         return bool(rows)
+
+    def dashboard_snapshot(self, user_id: str) -> tuple[list[dict], list[dict], list[dict], list[dict]]:
+        results = self.database.execute_batch([
+            ("SELECT id,name,category,subject,body,is_active,created_at,updated_at FROM email_templates WHERE user_id=? AND is_active=1 ORDER BY updated_at DESC", (user_id,), True),
+            ("SELECT id,provider,email,display_name,status,last_error,webhook_status,webhook_url,created_at,updated_at FROM sender_connections WHERE user_id=? ORDER BY updated_at DESC", (user_id,), True),
+            ("""
+                SELECT c.*, s.email AS sender_email FROM campaigns c
+                LEFT JOIN sender_connections s ON s.id=c.sender_id
+                WHERE c.user_id=? ORDER BY c.created_at DESC
+            """, (user_id,), True),
+            ("""
+                SELECT r.id,r.campaign_id,c.name AS campaign_name,r.lead_id,l.company_name,
+                       r.from_email,r.to_email,r.subject,r.snippet,r.body_text,r.classification,r.received_at
+                FROM inbound_replies r
+                LEFT JOIN campaigns c ON c.id=r.campaign_id
+                LEFT JOIN leads l ON l.id=r.lead_id
+                WHERE r.user_id=? ORDER BY r.received_at DESC LIMIT 200
+            """, (user_id,), True),
+        ])
+        return results[0].rows, results[1].rows, results[2].rows, results[3].rows
 
     # Campaigns
     def _campaign_row(self, user_id, campaign_id):

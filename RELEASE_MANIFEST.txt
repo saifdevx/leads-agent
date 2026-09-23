@@ -1,35 +1,51 @@
-LEAD PLATFORM — REPLIES / FOLLOW-UPS / ANALYTICS BUNDLE
+LEAD PLATFORM — ADMIN / PRODUCTION / PERFORMANCE BUNDLE
 
 PURPOSE
-- Add reply handling, follow-up automation, campaign analytics and faster UI interactions.
+- Add production operations, admin control, durable workers and a deeper performance pass without redesigning the working lead/outreach product.
 
-ADD / MAJOR CHANGES
-- backend/migrations/003_replies_followups.sql
-- backend reply/follow-up repository and API support
-- Hostinger inbox sync + webhook-ready receiver
-- frontend Reply Inbox + campaign detail drawer
-- frontend optimistic actions + response cache
-- bulk lead deletion
-- subtle motion styles
+MAJOR ADDITIONS
+- backend/migrations/004_admin_operations.sql
+- backend/app/admin/
+- backend/app/api/admin.py
+- backend/app/jobs/worker.py
+- frontend/src/pages/AdminPage.tsx
+- production render.yaml
+- lower-cost render-low-cost.yaml
+- snapshot APIs for My Leads and Outreach
+- persistent Turso HTTP connection pooling
+- user access cache + frontend in-flight request dedupe
+- Hostinger live-webhook status/setup UI
 
-KEEP / DO NOT REPLACE WITH SECRETS
+KEEP / NEVER OVERWRITE WITH THE ZIP
 - .git/
 - backend/.env
 - backend/.venv/
 - frontend/.env
-- local frontend/node_modules/
-- CREDENTIAL_ENCRYPTION_KEY value
+- frontend/package-lock.json
+- frontend/node_modules/
 - Firebase Admin private JSON
+- CREDENTIAL_ENCRYPTION_KEY value
+- Turso / provider / Hostinger secrets
 
 DATABASE
-- Run `python -m app.db.migrate` once after update.
-- Expected new migration: 003_replies_followups.
+- Take a Turso backup/branch before applying to important data.
+- Run: python -m app.db.migrate
+- Expected new migration: 004_admin_operations
+- Run migration again; it should report up to date.
+
+LOCAL ADMIN
+- Add your own login email to backend/.env:
+  ADMIN_EMAILS=you@example.com
+- Restart backend and sign in again.
 
 TEST
 - Backend: pytest -q
 - Frontend: npm run check && npm run test && npm run build
-- Then test one controlled send + reply sync + stop-on-reply.
+- Verify admin access, user controls, lead/outreach page speed, worker health and existing lead/outreach regression flows.
+
+PRODUCTION
+- Follow docs/PRODUCTION_DEPLOYMENT.md.
 
 ROLLBACK
-- Keep the previous Git commit before copying this bundle.
-- Because migration 003 restructures email_messages, take a Turso backup/branch before applying it to important production data.
+- Preserve the previous working Git commit before updating.
+- Migration 004 is additive, but production data should still be backed up before applying it.

@@ -7,3 +7,5 @@ class AuthenticatedUser(BaseModel):
     name: str | None = None
     email_verified: bool = False
     sign_in_provider: str | None = None
+    role: str = "user"
+    status: str = "active"

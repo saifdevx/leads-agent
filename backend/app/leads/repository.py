@@ -155,6 +155,43 @@ class LeadRepository:
         )
         return result.rows
 
+    def database_snapshot(self, user_id: str, list_id: str | None = None) -> tuple[list[dict], list[dict]]:
+        list_sql = """
+            SELECT ll.id, ll.name, ll.niche, ll.location, ll.target_count, ll.status,
+                   ll.created_at, ll.updated_at,
+                   (SELECT COUNT(*) FROM leads l WHERE l.user_id = ll.user_id AND l.list_id = ll.id) AS lead_count
+            FROM lead_lists ll
+            WHERE ll.user_id = ?
+            ORDER BY ll.created_at DESC
+        """
+        if list_id:
+            lead_sql = """
+                SELECT id, list_id, company_name, website, domain, first_name, last_name,
+                       job_title, email, email_status, phone, linkedin_url, instagram_url,
+                       facebook_url, city, region, country, source, source_url, source_query,
+                       score, status, created_at, updated_at
+                FROM leads
+                WHERE user_id = ? AND list_id = ?
+                ORDER BY created_at DESC
+            """
+            lead_params = (user_id, list_id)
+        else:
+            lead_sql = """
+                SELECT id, list_id, company_name, website, domain, first_name, last_name,
+                       job_title, email, email_status, phone, linkedin_url, instagram_url,
+                       facebook_url, city, region, country, source, source_url, source_query,
+                       score, status, created_at, updated_at
+                FROM leads
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+            """
+            lead_params = (user_id,)
+        results = self.database.execute_batch([
+            (list_sql, (user_id,), True),
+            (lead_sql, lead_params, True),
+        ])
+        return results[0].rows, results[1].rows
+
     def list_leads(self, user_id: str, list_id: str | None = None) -> list[dict]:
         if list_id:
             self.get_lead_list(user_id, list_id)

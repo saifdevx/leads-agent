@@ -41,6 +41,7 @@ from app.outreach.schemas import (
     SenderResponse,
     SuppressionCreate,
     SyncRepliesResponse,
+    OutreachSnapshotResponse,
     TemplateCreate,
     TemplateResponse,
 )
@@ -54,6 +55,20 @@ def _template(row):
 
 def _campaign(row):
     return CampaignResponse(**{**row, "stop_on_reply": bool(row.get("stop_on_reply", 1))})
+
+
+@router.get("/snapshot", response_model=OutreachSnapshotResponse)
+def outreach_snapshot(
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    repo: OutreachRepository = Depends(get_outreach_repository),
+) -> OutreachSnapshotResponse:
+    templates, senders, campaigns, replies = repo.dashboard_snapshot(current_user.uid)
+    return OutreachSnapshotResponse(
+        templates=[_template(row) for row in templates],
+        senders=[SenderResponse(**row) for row in senders],
+        campaigns=[_campaign(row) for row in campaigns],
+        replies=[ReplyResponse(**row) for row in replies],
+    )
 
 
 @router.get("/templates", response_model=list[TemplateResponse])
@@ -164,8 +179,13 @@ def setup_hostinger_webhook(sender_id: str, current_user: AuthenticatedUser = De
             raise HostingerMailError("Hostinger created the webhook without returning its one-time secret.")
         credentials.update({"webhook_id": data.get("id"), "webhook_secret": secret, "webhook_url": webhook_url})
         repo.update_sender_credentials(current_user.uid, sender_id, credentials)
+        repo.mark_sender_webhook(current_user.uid, sender_id, status="active", url=webhook_url)
         return {"configured": True, "url": webhook_url}
     except (OutreachNotFoundError, HostingerMailError, ValueError) as exc:
+        try:
+            repo.mark_sender_webhook(current_user.uid, sender_id, status="error")
+        except Exception:
+            pass
         raise HTTPException(400, str(exc)) from exc
 
 

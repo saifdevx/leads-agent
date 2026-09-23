@@ -22,6 +22,8 @@ class SenderResponse(BaseModel):
     display_name: str | None = None
     status: str
     last_error: str | None = None
+    webhook_status: str = "not_configured"
+    webhook_url: str | None = None
     created_at: str
     updated_at: str
 
@@ -167,3 +169,10 @@ class SyncRepliesResponse(BaseModel):
     checked_count: int
     matched_count: int
     new_replies: int
+
+
+class OutreachSnapshotResponse(BaseModel):
+    templates: list[TemplateResponse]
+    senders: list[SenderResponse]
+    campaigns: list[CampaignResponse]
+    replies: list[ReplyResponse]

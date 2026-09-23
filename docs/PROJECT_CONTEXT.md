@@ -1,71 +1,201 @@
-# Leads Agent Project Context
+# Leads Agent — Current Project Context
 
-## Product
-Custom React/FastAPI lead-generation and outreach web app. Keep the normal UX simple: **Find Leads → My Leads → Outreach → Settings**.
+Use this file as the authoritative handoff if the conversation is lost.
+
+## Product goal
+
+A custom Lead Generation + Outreach web app with a simple user-facing workflow:
+
+**Find Leads → My Leads → Outreach → Settings**
+
+Admin is shown only to administrators.
+
+The user wants the complex provider/worker/database systems hidden behind a simple, premium B2B SaaS interface.
 
 ## Stack
-- React + Vite + TypeScript + Tailwind CSS
-- FastAPI / Python
-- Firebase Auth
+
+Frontend:
+- React + Vite + TypeScript + Tailwind
+
+Backend:
+- FastAPI + Python
+
+Auth:
+- Firebase Authentication
+- server-side Firebase token verification
+
+Database:
 - Turso SQL-over-HTTP
-- Serper/Brave search adapters
-- Gemini/OpenAI BYOK
+
+Search / AI / enrichment:
+- Serper / Brave
+- Gemini / OpenAI
+- Prospeo / Apollo
+
+Email:
+- Hostinger Agentic Mail primary
+- Gmail optional
+
+Production target:
+- Render static frontend
+- Render FastAPI API
+- Render lead/discovery worker
+- Render outreach worker
+
+## Working feature set
+
+- Firebase login/register/Google/password reset
+- Turso user/application data
+- automated lead discovery
+- website crawling
+- AI cleanup
+- lead deduplication
 - Prospeo/Apollo enrichment
-- Hostinger Agentic Mail primary sender
+- Excel/CSV import
+- Excel/CSV export
+- My Leads filters/bulk operations
+- Hostinger sender
 - Gmail optional sender
+- Quick Send
+- templates
+- campaigns + preview/approval
+- configurable intervals and optional sending window
+- suppression list
+- follow-up sequences
+- reply sync/inbox
+- stop-on-reply
+- reply classification
+- campaign analytics/detail/retry
+- optimistic UI/cache for common actions
 
-## Current working flow
-1. User signs in.
-2. Finds leads automatically or imports Excel/CSV.
-3. Reviews, filters, enriches, deletes and exports leads.
-4. Selects leads for Outreach.
-5. Creates templates.
-6. Connects Hostinger/Gmail sender.
-7. Creates a campaign, optionally adds follow-up templates, previews and approves.
-8. Worker sends the initial message and schedules later follow-ups.
-9. Reply sync/webhook records replies and stop-on-reply cancels future steps.
-10. Reply Inbox and campaign details show outreach outcomes.
-
-## Latest bundle
-**Replies + follow-ups + campaign analytics + responsiveness**
+## Latest bundle: Admin + production + performance
 
 Adds:
-- follow-up sequences
-- stop-on-reply
-- Reply Inbox
-- manual Hostinger reply sync locally
-- Hostinger webhook-ready production endpoint
-- interested/not-interested/unsubscribe/out-of-office classification
-- unsubscribe suppression
-- campaign details + reply rate + message statuses
-- failed-message retry
-- optimistic campaign controls
-- optimistic bulk lead deletion
-- short-lived frontend response cache
-- subtle animations
-- fix for all-day sending window
+- Admin UI: Overview / Users / Jobs / System
+- `ADMIN_EMAILS` admin bootstrap
+- user suspension/reactivation
+- server-side suspended-user enforcement
+- admin audit log
+- failed-job retry controls
+- provider/worker/webhook health
+- durable lead/enrichment worker
+- job claiming/locks/stale-release
+- lead/outreach worker heartbeats
+- Render production Blueprint
+- real Hostinger live-webhook setup after public deployment
+- persistent Turso HTTP connection pooling
+- lead database snapshot endpoint
+- outreach dashboard snapshot endpoint
+- frontend in-flight GET request deduplication
+- short-lived user access-state cache
 
 ## New migration
-`003_replies_followups`
 
-## New environment variable
-`PUBLIC_API_URL=` — leave blank locally; set to deployed API HTTPS base URL later.
+`004_admin_operations`
 
-## Local paths
-Repo: `D:\Leads-Agent\leads-agent`
-Firebase Admin secret: outside repo under `D:\Leads-Agent\secrets\`
+Adds:
+- `users.role`
+- `jobs.locked_at`
+- `jobs.locked_by`
+- sender webhook status/url
+- `worker_heartbeats`
+- `admin_audit_log`
 
-## Secrets
-Never commit `.env`, Firebase JSON, Turso tokens, provider API keys, Hostinger tokens, Gmail OAuth secret, or webhook secrets. Never regenerate `CREDENTIAL_ENCRYPTION_KEY` after credentials have been stored.
+## New/important environment names
 
-## Git preference
-User prefers normal professional commit messages and does not want public checkpoint/version tags.
+Backend:
+```text
+ADMIN_EMAILS
+BACKGROUND_JOBS_MODE
+WORKER_POLL_SECONDS
+WORKER_LEASE_SECONDS
+USER_ACCESS_CACHE_SECONDS
+PUBLIC_API_URL
+```
 
-## Remaining final roadmap
-The project is intentionally finishing in three large bundles:
+Keep all previously configured Firebase/Turso/provider/email values.
 
-1. **Replies + follow-ups + campaign analytics** — THIS BUNDLE.
-2. **Admin + production deployment + deeper performance optimization**.
-3. **Final UX + security + release polish**.
+Never regenerate `CREDENTIAL_ENCRYPTION_KEY` while stored encrypted credentials exist.
 
-Do not redesign completed Firebase, Turso, discovery, enrichment, export, import, sender, campaign, or reply systems from scratch.
+## Local mode
+
+Recommended:
+```env
+BACKGROUND_JOBS_MODE=inline
+PUBLIC_API_URL=
+ADMIN_EMAILS=your-own-login@example.com
+```
+
+Local processes:
+- FastAPI
+- Vite frontend
+- outreach worker
+
+Lead worker is optional locally unless testing worker mode.
+
+## Production mode
+
+Render API:
+```env
+BACKGROUND_JOBS_MODE=worker
+PUBLIC_API_URL=https://YOUR-API.onrender.com
+CORS_ORIGINS=https://YOUR-FRONTEND.onrender.com
+FRONTEND_APP_URL=https://YOUR-FRONTEND.onrender.com
+ADMIN_EMAILS=your-admin-login@example.com
+```
+
+Production includes both background workers.
+
+After deploy, enable Hostinger live replies from Outreach → Senders.
+
+## Design direction
+
+Professional B2B SaaS. Avoid generic AI-template aesthetics.
+
+Colors:
+- Purple #7B61FF
+- Secondary Purple #9D84FF
+- Light Accent #B39CFF
+- Lime #BCE953 sparingly
+- Ink #14151C
+- Slate #4B4F5E
+- Lavender #E8EAF3
+- White #FFFFFF
+
+Typography:
+- Manrope headings
+- Inter UI/body
+
+## Git / delivery preference
+
+Repository:
+https://github.com/saifdevx/leads-agent
+
+User prefers normal professional commit messages and no public checkpoint/version tags.
+
+Deliver complete ZIP bundles with setup/test/rollback docs.
+
+Do not overwrite:
+- `.git`
+- `.env` files
+- `.venv`
+- local `node_modules`
+- Firebase private JSON
+- secrets
+
+## Next and final planned bundle
+
+**Final UX + Security + Release Polish**
+
+This should include:
+- cohesive UI refinement across every screen
+- better dashboard/home summary
+- final responsive/mobile pass
+- accessibility
+- loading/empty/error/success consistency
+- security/rate-limit/abuse hardening
+- final audit/history usability
+- production smoke/e2e/regression coverage
+- final release/runbook documentation
+
+Do not restart completed Firebase/Turso/discovery/enrichment/outreach architecture.

@@ -1,3 +1,9 @@
+# Lower-cost production option for early personal use.
+# Uses the API process for discovery/enrichment background tasks and keeps only
+# the outreach worker separate so scheduled email sending remains reliable.
+# Upgrade to render.yaml when you want durable discovery/enrichment jobs that
+# survive API restarts/deploys independently.
+
 services:
   - type: web
     runtime: static
@@ -56,11 +62,7 @@ services:
       - key: LOG_LEVEL
         value: INFO
       - key: BACKGROUND_JOBS_MODE
-        value: worker
-      - key: WORKER_POLL_SECONDS
-        value: 3
-      - key: WORKER_LEASE_SECONDS
-        value: 300
+        value: inline
       - key: USER_ACCESS_CACHE_SECONDS
         value: 30
       - key: CORS_ORIGINS
@@ -88,34 +90,6 @@ services:
       - key: GMAIL_OAUTH_CLIENT_SECRET
         sync: false
       - key: GMAIL_OAUTH_REDIRECT_URI
-        sync: false
-
-  - type: worker
-    runtime: python
-    name: lead-platform-lead-worker
-    rootDir: backend
-    plan: 0.5c-512mb
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m app.jobs.worker
-    maxShutdownDelaySeconds: 60
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: APP_VERSION
-        value: 0.11.0
-      - key: LOG_LEVEL
-        value: INFO
-      - key: WORKER_POLL_SECONDS
-        value: 3
-      - key: WORKER_LEASE_SECONDS
-        value: 300
-      - key: TURSO_DATABASE_URL
-        sync: false
-      - key: TURSO_AUTH_TOKEN
-        sync: false
-      - key: TURSO_TIMEOUT_SECONDS
-        value: 15
-      - key: CREDENTIAL_ENCRYPTION_KEY
         sync: false
 
   - type: worker

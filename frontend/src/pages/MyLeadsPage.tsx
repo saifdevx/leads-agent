@@ -5,8 +5,7 @@ import {
   deleteLeads,
   downloadLeadExport,
   getJob,
-  getLeadLists,
-  getLeads,
+  getLeadDatabaseSnapshot,
   importLeadFile,
   startLeadEnrichment,
   type Lead,
@@ -58,14 +57,11 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
     setLoading(true)
     setError(null)
     getToken()
-      .then(async (token) => Promise.all([
-        getLeadLists(token, refreshKey > 0),
-        getLeads(token, selectedList === 'all' ? undefined : selectedList, refreshKey > 0),
-      ]))
-      .then(([nextLists, nextLeads]) => {
+      .then((token) => getLeadDatabaseSnapshot(token, selectedList === 'all' ? undefined : selectedList, refreshKey > 0))
+      .then((snapshot) => {
         if (!active) return
-        setLists(nextLists)
-        setLeads(nextLeads)
+        setLists(snapshot.lead_lists)
+        setLeads(snapshot.leads)
         setSelectedIds(new Set())
       })
       .catch((nextError) => {

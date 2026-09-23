@@ -13,6 +13,8 @@ export type AuthenticatedUserResponse = {
   name: string | null
   email_verified: boolean
   sign_in_provider: string | null
+  role: 'user' | 'admin' | string
+  status: 'active' | 'suspended' | string
 }
 
 export type LeadList = {
@@ -79,6 +81,7 @@ const API_URL = (import.meta.env.VITE_API_URL || 'http://localhost:8000').replac
 
 type CacheEntry = { expiresAt: number; value: unknown }
 const responseCache = new Map<string, CacheEntry>()
+const inflightCache = new Map<string, Promise<unknown>>()
 
 export function invalidateApiCache(prefix = '') {
   for (const key of responseCache.keys()) {
@@ -91,9 +94,18 @@ async function cachedAuthRequest<T>(path: string, idToken: string, ttlMs = 8000,
   const key = `${idToken.slice(-24)}|${path}`
   const cached = responseCache.get(key)
   if (!force && cached && cached.expiresAt > Date.now()) return cached.value as T
-  const value = await authRequest<T>(path, idToken)
-  responseCache.set(key, { expiresAt: Date.now() + ttlMs, value })
-  return value
+  if (!force) {
+    const active = inflightCache.get(key)
+    if (active) return active as Promise<T>
+  }
+  const request = authRequest<T>(path, idToken)
+    .then((value) => {
+      responseCache.set(key, { expiresAt: Date.now() + ttlMs, value })
+      return value
+    })
+    .finally(() => inflightCache.delete(key))
+  inflightCache.set(key, request)
+  return request
 }
 
 export class ApiRequestError extends Error {
@@ -183,6 +195,11 @@ export async function getLeads(idToken: string, listId?: string, force = false):
   return cachedAuthRequest<Lead[]>(`/api/v1/leads${query}`, idToken, 7000, force)
 }
 
+export async function getLeadDatabaseSnapshot(idToken: string, listId?: string, force = false): Promise<{ lead_lists: LeadList[]; leads: Lead[] }> {
+  const query = listId ? `?list_id=${encodeURIComponent(listId)}` : ''
+  return cachedAuthRequest<{ lead_lists: LeadList[]; leads: Lead[] }>(`/api/v1/leads/snapshot${query}`, idToken, 7000, force)
+}
+
 export type LeadFileImportResult = {
   lead_list: LeadList
   extracted_count: number
@@ -261,8 +278,8 @@ export type JobStatus = {
   completed_at: string | null
 }
 
-export async function getProviders(idToken: string): Promise<ProviderConnection[]> {
-  return authRequest<ProviderConnection[]>('/api/v1/providers', idToken)
+export async function getProviders(idToken: string, force = false): Promise<ProviderConnection[]> {
+  return cachedAuthRequest<ProviderConnection[]>('/api/v1/providers', idToken, 12000, force)
 }
 
 export async function connectProvider(
@@ -369,6 +386,8 @@ export type SenderConnection = {
   display_name: string | null
   status: string
   last_error: string | null
+  webhook_status: string
+  webhook_url: string | null
   created_at: string
   updated_at: string
 }
@@ -405,6 +424,10 @@ export type CampaignCreateResult = {
   preview: CampaignPreviewItem[]
   suppressed_count: number
   missing_email_count: number
+}
+
+export async function getOutreachSnapshot(idToken: string, force = false): Promise<{ templates: EmailTemplate[]; senders: SenderConnection[]; campaigns: Campaign[]; replies: OutreachReply[] }> {
+  return cachedAuthRequest<{ templates: EmailTemplate[]; senders: SenderConnection[]; campaigns: Campaign[]; replies: OutreachReply[] }>('/api/v1/outreach/snapshot', idToken, 6000, force)
 }
 
 export async function getTemplates(idToken: string, force = false): Promise<EmailTemplate[]> {
@@ -511,4 +534,48 @@ export async function deleteLeads(idToken: string, leadIds: string[]): Promise<n
   invalidateApiCache('/api/v1/leads')
   invalidateApiCache('/api/v1/lead-lists')
   return result.deleted_count
+}
+
+
+export async function setupHostingerWebhook(idToken: string, senderId: string): Promise<{ configured: boolean; url: string }> {
+  const value = await authRequest<{ configured: boolean; url: string }>(`/api/v1/outreach/senders/${encodeURIComponent(senderId)}/webhook`, idToken, { method: 'POST' })
+  invalidateApiCache('/api/v1/outreach/senders')
+  return value
+}
+
+export type AdminOverview = {
+  users_total: number; users_active: number; users_suspended: number; leads_total: number; lead_lists_total: number;
+  campaigns_total: number; emails_sent: number; replies_total: number; jobs_running: number; jobs_failed: number;
+  connected_providers: number; connected_senders: number; search_calls: number; websites_checked: number; enriched_contacts: number;
+}
+export type AdminUser = { firebase_uid: string; email: string | null; display_name: string | null; role: string; status: string; lead_count: number; campaign_count: number; created_at: string; last_login_at: string }
+export type AdminJob = { id: string; user_id: string; user_email: string | null; job_type: string; status: string; attempt_count: number; max_attempts: number; last_error: string | null; created_at: string; updated_at: string; started_at: string | null; completed_at: string | null }
+export type AdminSystem = { database_ok: boolean; environment: string; api_version: string; public_api_configured: boolean; firebase_configured: boolean; credential_encryption_configured: boolean; background_jobs_mode: string; workers: { worker_name: string; instance_id: string | null; last_seen_at: string; healthy: boolean }[]; providers: { provider: string; connected_count: number; error_count: number }[]; hostinger_webhooks_configured: number }
+
+export async function getAdminOverview(idToken: string, force = false): Promise<AdminOverview> {
+  return cachedAuthRequest<AdminOverview>('/api/v1/admin/overview', idToken, 10000, force)
+}
+export async function getAdminUsers(idToken: string, input: { search?: string; status?: string } = {}, force = false): Promise<{ items: AdminUser[]; total: number }> {
+  const params = new URLSearchParams()
+  if (input.search) params.set('search', input.search)
+  if (input.status) params.set('status', input.status)
+  const suffix = params.toString() ? `?${params}` : ''
+  return cachedAuthRequest<{ items: AdminUser[]; total: number }>(`/api/v1/admin/users${suffix}`, idToken, 8000, force)
+}
+export async function updateAdminUserStatus(idToken: string, uid: string, status: 'active'|'suspended'): Promise<AdminUser> {
+  const value = await authRequest<AdminUser>(`/api/v1/admin/users/${encodeURIComponent(uid)}/status`, idToken, { method: 'PATCH', body: JSON.stringify({ status }) })
+  invalidateApiCache('/api/v1/admin')
+  return value
+}
+export async function getAdminJobs(idToken: string, status = '', force = false): Promise<{ items: AdminJob[]; total: number }> {
+  const suffix = status ? `?status=${encodeURIComponent(status)}` : ''
+  return cachedAuthRequest<{ items: AdminJob[]; total: number }>(`/api/v1/admin/jobs${suffix}`, idToken, 6000, force)
+}
+export async function retryAdminJob(idToken: string, jobId: string): Promise<AdminJob> {
+  const value = await authRequest<AdminJob>(`/api/v1/admin/jobs/${encodeURIComponent(jobId)}/retry`, idToken, { method: 'POST' })
+  invalidateApiCache('/api/v1/admin/jobs')
+  return value
+}
+export async function getAdminSystem(idToken: string, force = false): Promise<AdminSystem> {
+  return cachedAuthRequest<AdminSystem>('/api/v1/admin/system', idToken, 8000, force)
 }

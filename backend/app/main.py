@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
+from app.api.admin import router as admin_router
 from app.api.health import router as health_router
 from app.api.leads import router as leads_router
 from app.api.jobs import router as jobs_router
@@ -184,6 +185,7 @@ async def unexpected_exception_handler(request: Request, exc: Exception):
 
 
 app.include_router(health_router)
+app.include_router(admin_router)
 app.include_router(auth_router)
 app.include_router(leads_router)
 app.include_router(providers_router)

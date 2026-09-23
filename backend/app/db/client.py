@@ -109,6 +109,15 @@ class TursoHttpClient:
         self.auth_token = auth_token.strip()
         self.timeout_seconds = timeout_seconds
         self.transport = transport
+        self._client = httpx.Client(
+            timeout=self.timeout_seconds,
+            transport=self.transport,
+            http2=(self.transport is None),
+            limits=httpx.Limits(max_connections=20, max_keepalive_connections=10, keepalive_expiry=30.0),
+        )
+
+    def close(self) -> None:
+        self._client.close()
 
     def execute(
         self,
@@ -186,15 +195,11 @@ class TursoHttpClient:
             if delay:
                 time.sleep(delay)
             try:
-                with httpx.Client(
-                    timeout=self.timeout_seconds,
-                    transport=self.transport,
-                ) as client:
-                    response = client.post(
-                        f"{self.base_url}/v3/pipeline",
-                        headers=headers,
-                        json=payload,
-                    )
+                response = self._client.post(
+                    f"{self.base_url}/v3/pipeline",
+                    headers=headers,
+                    json=payload,
+                )
             except httpx.RequestError as exc:
                 last_error = exc
                 if attempt < len(retry_delays) - 1:

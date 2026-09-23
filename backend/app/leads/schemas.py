@@ -111,3 +111,8 @@ class LeadExportRequest(BaseModel):
     search: str | None = Field(default=None, max_length=200)
     email_filter: str = Field(default="all", pattern="^(all|verified|has_email|missing_email)$")
     min_score: float | None = Field(default=None, ge=0, le=100)
+
+
+class LeadDatabaseSnapshotResponse(BaseModel):
+    lead_lists: list[LeadListResponse]
+    leads: list[LeadResponse]

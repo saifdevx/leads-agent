@@ -1,27 +1,57 @@
 # Delivery
 
+## Purpose
+
+Add the second final product bundle: **Admin + production deployment + performance**.
+
 ## Replace
-Copy all source files in this package over the existing repository.
+
+Replace normal tracked source files with the contents of this bundle.
 
 ## Keep locally
+
 - `.git/`
 - `backend/.env`
 - `backend/.venv/`
 - `frontend/.env`
 - `frontend/package-lock.json`
 - `frontend/node_modules/`
+- Firebase private JSON
+- all real secrets
 
-## Environment
-Recommended only:
+## Additions
+
+- Admin backend/API/UI
+- Migration 004
+- durable lead worker
+- worker heartbeats
+- live Hostinger webhook enablement UI/status
+- Render Blueprint
+- production deployment guide
+- performance snapshot endpoints
+- connection pooling / frontend request dedupe
+
+## Environment additions
 
 ```env
-TURSO_TIMEOUT_SECONDS=15
+ADMIN_EMAILS=
+BACKGROUND_JOBS_MODE=inline
+WORKER_POLL_SECONDS=3
+WORKER_LEASE_SECONDS=300
+USER_ACCESS_CACHE_SECONDS=30
+PUBLIC_API_URL=
 ```
 
-Do not regenerate `CREDENTIAL_ENCRYPTION_KEY`.
+`PUBLIC_API_URL` remains blank locally.
 
-## Install / test
-See the root `README.md` and `docs/TEST_CHECKLIST.md`.
+## Migration
 
-## Rollback
-No database schema change exists. Restore the previous Git commit and preserve local secrets.
+```powershell
+python -m app.db.migrate
+```
+
+Expected new migration: `004_admin_operations`.
+
+## Validation
+
+Follow `TEST_CHECKLIST.md`.

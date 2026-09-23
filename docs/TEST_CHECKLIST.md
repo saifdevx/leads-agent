@@ -1,78 +1,146 @@
-# Test Checklist
+# Test Checklist — Admin / Production / Performance
 
-## Regression
-
-Frontend:
-```powershell
-npm install --include=optional
-npm run check
-npm run test
-npm run build
-```
+## 1. Automated regression
 
 Backend:
 ```powershell
+cd D:\Leads-Agent\leads-agent\backend
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 pytest -q
 python -m app.db.migrate
 ```
 
-Migration should apply `003_replies_followups` once, then report up to date.
+First migration run after update should apply:
 
-## Existing product
-- [ ] Firebase login/logout still works.
-- [ ] Automated lead discovery still works.
-- [ ] My Leads still loads and filters.
-- [ ] Prospeo/Apollo enrichment still works.
-- [ ] Excel/CSV import and export still work.
+```text
+004_admin_operations
+```
+
+Run it again. Expected:
+
+```text
+Database schema is already up to date.
+```
+
+Frontend:
+```powershell
+cd D:\Leads-Agent\leads-agent\frontend
+npm install --include=optional
+npm run check
+npm run test
+npm run build
+npm run dev
+```
+
+## 2. Existing product regression
+
+- [ ] Firebase login/logout works.
+- [ ] Find Leads opens.
+- [ ] Automated lead discovery works locally with `BACKGROUND_JOBS_MODE=inline`.
+- [ ] My Leads loads lists + leads.
+- [ ] Lead search/filter/select works.
+- [ ] Bulk delete remains optimistic and rolls back on failure.
+- [ ] Enrichment starts and completes.
+- [ ] Excel/CSV import works.
+- [ ] Excel/CSV export works.
+- [ ] Outreach loads campaigns/templates/senders/replies.
 - [ ] Hostinger sender remains connected.
-- [ ] Quick Send still works.
-- [ ] Existing templates still load.
-- [ ] Existing campaigns still load after migration.
+- [ ] Quick Send works.
+- [ ] Campaign create/preview/approve works.
+- [ ] Pause/resume/cancel reacts immediately.
+- [ ] Outreach worker sends queued messages.
+- [ ] Follow-ups and reply sync still work.
 
-## Responsiveness / cache
-- [ ] Pause campaign changes UI immediately.
-- [ ] Resume changes UI immediately.
-- [ ] Cancel changes UI immediately.
-- [ ] A failed action rolls the optimistic state back and shows an error.
-- [ ] Bulk lead delete removes rows immediately.
-- [ ] Refresh forces fresh server state.
-- [ ] Logging out/in as another account does not show the previous account's cached data.
+## 3. Admin setup
 
-## Follow-ups
-- [ ] Create campaign with initial + Follow-up 1.
-- [ ] Create campaign with initial + two follow-ups.
-- [ ] Initial message is the only message queued immediately after approval.
-- [ ] Follow-up becomes queued only after prior step is sent.
-- [ ] Delay is calculated relative to prior successful send.
-- [ ] Cancel campaign cancels unsent sequence messages.
-- [ ] All-day sending (`0 → 24`) works even before 9 AM.
+Add your own Firebase account email to backend `.env`:
 
-## Replies
-- [ ] Send to an address you control.
-- [ ] Reply from the recipient address.
-- [ ] Local **Sync Hostinger replies** detects it.
-- [ ] Same provider UID is not duplicated.
-- [ ] Multiple replies from the same lead count as one replied lead in campaign reply rate.
-- [ ] Stop-on-reply cancels future unsent sequence messages.
-- [ ] `unsubscribe` reply adds email to suppression list.
-- [ ] `out of office` is classified correctly.
-- [ ] `not interested` is classified correctly.
-- [ ] interested wording is classified as interested.
+```env
+ADMIN_EMAILS=your@email.com
+```
 
-## Campaign details / analytics
-- [ ] Campaign details drawer opens.
-- [ ] Sequence steps render in order.
-- [ ] Initial/follow-up statuses are accurate.
-- [ ] Sent count includes actually sent messages.
-- [ ] Replied count represents unique leads that replied.
-- [ ] Interested count is accurate.
-- [ ] Reply rate is sensible.
-- [ ] Failed message offers Retry.
-- [ ] Retry does not bypass suppression or replied-lead safety checks.
+Restart backend, sign out/in (or refresh the verified session).
 
-## Production webhook readiness
-- [ ] Local app works with `PUBLIC_API_URL` empty.
-- [ ] Webhook setup clearly requires public HTTPS URL.
-- [ ] Webhook rejects missing/incorrect bearer secret.
+- [ ] Admin item appears only for the configured admin.
+- [ ] Normal users do not see Admin.
+- [ ] Direct `/api/v1/admin/*` access by a normal user returns 403.
+
+## 4. Admin overview
+
+- [ ] User count loads.
+- [ ] Lead/list counts load.
+- [ ] Sent/reply counts load.
+- [ ] Failed/running job counts load.
+- [ ] Search-call / website / enrichment activity appears.
+- [ ] Provider/sender connection totals load.
+- [ ] Manual Refresh works.
+
+## 5. User controls
+
+Use a disposable test account if possible.
+
+- [ ] Suspend user updates UI immediately.
+- [ ] Suspended user receives 403 on protected API requests.
+- [ ] Reactivate user works.
+- [ ] Admin cannot suspend their own admin account.
+- [ ] Lead/campaign counts do not reset to zero after status action.
+
+## 6. Jobs
+
+- [ ] Jobs tab lists pending/running/failed/complete jobs.
+- [ ] Failed retryable job shows Retry.
+- [ ] Retry returns job to pending.
+- [ ] Non-failed/non-retryable job cannot be retried through the endpoint.
+
+## 7. Performance checks
+
+With browser Network panel open:
+
+- [ ] Initial My Leads load uses `/api/v1/leads/snapshot` rather than separate leads + lists requests.
+- [ ] Initial Outreach load uses `/api/v1/outreach/snapshot` rather than four separate dashboard requests.
+- [ ] Duplicate simultaneous provider GETs are reduced/deduplicated.
+- [ ] Pause/resume/delete gives immediate visual feedback.
+- [ ] Forced Refresh still loads fresh server truth.
+- [ ] Logging out/in as another account does not expose previous user's cached data.
+
+## 8. Local workers
+
+Normal local setup:
+- API
+- frontend
+- outreach worker
+
+Local lead discovery can remain inline.
+
+Optional worker-mode test:
+
+Set temporarily:
+```env
+BACKGROUND_JOBS_MODE=worker
+```
+
+Start:
+```powershell
+python -m app.jobs.worker
+```
+
+- [ ] Find Leads creates a pending job.
+- [ ] Lead worker claims it.
+- [ ] Browser refresh does not stop it.
+- [ ] Job completes and leads appear.
+
+Return to `BACKGROUND_JOBS_MODE=inline` for normal local development unless intentionally testing worker mode.
+
+## 9. Production smoke test
+
+After Render deployment:
+
+- [ ] `/health` is healthy.
+- [ ] Frontend login works on Render domain.
+- [ ] Admin → System says production / worker mode.
+- [ ] lead-worker heartbeat is healthy.
+- [ ] outreach-worker heartbeat is healthy.
+- [ ] Discovery continues after closing browser.
+- [ ] Hostinger live webhook can be enabled.
+- [ ] Controlled reply appears automatically without manual sync.

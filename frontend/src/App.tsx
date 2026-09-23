@@ -12,8 +12,9 @@ import { FindLeadsPage } from './pages/FindLeadsPage'
 import { MyLeadsPage } from './pages/MyLeadsPage'
 import { OutreachPage } from './pages/OutreachPage'
 import { SettingsPage } from './pages/SettingsPage'
+import { AdminPage } from './pages/AdminPage'
 
-type PageKey = 'find' | 'leads' | 'outreach' | 'settings'
+type PageKey = 'find' | 'leads' | 'outreach' | 'settings' | 'admin'
 type HealthState = 'loading' | 'online' | 'offline'
 
 const pageMeta: Record<PageKey, { title: string; eyebrow?: string }> = {
@@ -21,6 +22,7 @@ const pageMeta: Record<PageKey, { title: string; eyebrow?: string }> = {
   leads: { title: 'My Leads', eyebrow: 'Lead database' },
   outreach: { title: 'Outreach', eyebrow: 'Email campaigns' },
   settings: { title: 'Settings', eyebrow: 'Configuration' },
+  admin: { title: 'Admin', eyebrow: 'Platform operations' },
 }
 
 function Workspace({ user, identity, onSignOut }: { user: User; identity: AuthenticatedUserResponse; onSignOut: () => Promise<void> }) {
@@ -52,13 +54,17 @@ function Workspace({ user, identity, onSignOut }: { user: User; identity: Authen
     content = <MyLeadsPage getToken={getToken} onStartOutreach={(ids) => { setOutreachLeadIds(ids); setPage('outreach') }} />
   } else if (page === 'outreach') {
     content = <OutreachPage getToken={getToken} initialLeadIds={outreachLeadIds} onClearInitialLeadIds={() => setOutreachLeadIds([])} onOpenLeads={() => setPage('leads')} />
-  } else {
+  } else if (page === 'settings') {
     content = <SettingsPage getToken={getToken} />
+  } else if (identity.role === 'admin') {
+    content = <AdminPage getToken={getToken} />
+  } else {
+    content = <FindLeadsPage getToken={getToken} onViewLeads={() => setPage('leads')} onOpenSettings={() => setPage('settings')} />
   }
 
   return (
     <div>
-      <Sidebar active={page} onNavigate={setPage} mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} />
+      <Sidebar active={page} onNavigate={setPage} mobileOpen={mobileOpen} onMobileClose={() => setMobileOpen(false)} isAdmin={identity.role === 'admin'} />
       <PageShell
         title={pageMeta[page].title}
         eyebrow={pageMeta[page].eyebrow}

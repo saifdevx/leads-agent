@@ -39,6 +39,8 @@ def test_me_returns_verified_identity_with_dependency_override():
         "name": "Test User",
         "email_verified": True,
         "sign_in_provider": "password",
+        "role": "user",
+        "status": "active",
     }
 
 
@@ -63,8 +65,9 @@ def test_application_user_syncs_to_repository():
         def __init__(self):
             self.synced = None
 
-        def sync_authenticated_user(self, user):
+        def sync_authenticated_user(self, user, *, role_hint="user"):
             self.synced = user
+            return {"status": "active", "role": role_hint}
 
     user = AuthenticatedUser(
         uid="firebase-user-456",
@@ -80,5 +83,6 @@ def test_application_user_syncs_to_repository():
         repository=repository,
     )
 
-    assert result is user
+    assert result.uid == user.uid
+    assert result.status == "active"
     assert repository.synced is user

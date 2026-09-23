@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import os
+import socket
 import time
+import uuid
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
+from app.admin.repository import AdminRepository
 from app.core.config import get_settings
 from app.outreach.dependencies import get_outreach_repository
 from app.outreach.gmail import GmailError, refresh_access_token, send_message as send_gmail_message
@@ -119,14 +123,25 @@ def process_once() -> int:
 
 
 def main() -> None:
-    print("Outreach worker started. Press Ctrl+C to stop.")
+    repository = get_outreach_repository()
+    admin = AdminRepository(repository.database)
+    worker_id = f"{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:8]}"
+    print(f"Outreach worker started ({worker_id}). Press Ctrl+C to stop.", flush=True)
+    last_heartbeat = 0.0
     while True:
         try:
+            now_mono = time.monotonic()
+            if now_mono - last_heartbeat >= 20:
+                try:
+                    admin.heartbeat("outreach-worker", worker_id, {"provider": "email"})
+                except Exception as exc:
+                    print(f"Outreach heartbeat failed: {exc}", flush=True)
+                last_heartbeat = now_mono
             process_once()
         except KeyboardInterrupt:
             break
         except Exception as exc:
-            print(f"Worker iteration failed: {exc}")
+            print(f"Worker iteration failed: {exc}", flush=True)
         time.sleep(5)
 
 

@@ -16,6 +16,7 @@ export type IconName =
   | 'external'
   | 'import'
   | 'refresh'
+  | 'shield'
 
 const paths: Record<IconName, ReactNode> = {
   search: <><circle cx="11" cy="11" r="7"/><path d="m20 20-3.6-3.6"/></>,
@@ -33,6 +34,7 @@ const paths: Record<IconName, ReactNode> = {
   external: <><path d="M15 3h6v6"/><path d="m10 14 11-11"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></>,
   import: <><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></>,
   refresh: <><path d="M20 6v5h-5"/><path d="M4 18v-5h5"/><path d="M6.1 9a7 7 0 0 1 11.7-2.6L20 11M4 13l2.2 4.6A7 7 0 0 0 17.9 15"/></>,
+  shield: <><path d="M12 3 20 6v5c0 5-3.4 8.2-8 10-4.6-1.8-8-5-8-10V6l8-3Z"/><path d="m9 12 2 2 4-4"/></>,
 }
 
 export function Icon({ name, ...props }: { name: IconName } & SVGProps<SVGSVGElement>) {

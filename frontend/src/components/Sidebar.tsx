@@ -1,12 +1,13 @@
 import { Icon, type IconName } from './Icon'
 
-type NavKey = 'find' | 'leads' | 'outreach' | 'settings'
+type NavKey = 'find' | 'leads' | 'outreach' | 'settings' | 'admin'
 
 type Props = {
   active: NavKey
   onNavigate: (key: NavKey) => void
   mobileOpen: boolean
   onMobileClose: () => void
+  isAdmin?: boolean
 }
 
 const items: Array<{ key: NavKey; label: string; icon: IconName }> = [
@@ -16,7 +17,7 @@ const items: Array<{ key: NavKey; label: string; icon: IconName }> = [
   { key: 'settings', label: 'Settings', icon: 'settings' },
 ]
 
-export function Sidebar({ active, onNavigate, mobileOpen, onMobileClose }: Props) {
+export function Sidebar({ active, onNavigate, mobileOpen, onMobileClose, isAdmin = false }: Props) {
   const content = (
     <div className="flex h-full flex-col bg-[#14151C] px-4 py-5 text-white">
       <div className="flex items-center justify-between px-2">
@@ -33,7 +34,7 @@ export function Sidebar({ active, onNavigate, mobileOpen, onMobileClose }: Props
       </div>
 
       <nav className="mt-9 space-y-1" aria-label="Primary navigation">
-        {items.map((item) => {
+        {[...items, ...(isAdmin ? [{ key: 'admin' as NavKey, label: 'Admin', icon: 'shield' as IconName }] : [])].map((item) => {
           const selected = item.key === active
           return (
             <button

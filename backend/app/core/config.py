@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     app_name: str = "Lead Platform API"
-    app_version: str = "0.10.0"
+    app_version: str = "0.11.0"
     app_env: str = "development"
     cors_origins: str = "http://localhost:5173"
     log_level: str = "INFO"
@@ -21,6 +21,11 @@ class Settings(BaseSettings):
     gmail_oauth_client_id: str = ""
     gmail_oauth_client_secret: str = ""
     gmail_oauth_redirect_uri: str = "http://localhost:8000/api/v1/outreach/gmail/callback"
+    admin_emails: str = ""
+    background_jobs_mode: str = "inline"
+    worker_poll_seconds: float = 3.0
+    worker_lease_seconds: int = 300
+    user_access_cache_seconds: int = 30
 
     model_config = SettingsConfigDict(
         env_file=".env",
@@ -32,6 +37,10 @@ class Settings(BaseSettings):
     @property
     def cors_origin_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def admin_email_list(self) -> set[str]:
+        return {email.strip().lower() for email in self.admin_emails.split(",") if email.strip()}
 
 
 @lru_cache

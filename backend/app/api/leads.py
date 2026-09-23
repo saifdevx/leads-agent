@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field
 
 from app.auth.dependencies import get_current_user
 from app.auth.schemas import AuthenticatedUser
+from app.core.config import get_settings
 from app.db.dependencies import get_lead_repository
 from app.jobs.dependencies import get_job_repository
 from app.jobs.repository import JobRepository
@@ -30,6 +31,7 @@ from app.leads.schemas import (
     LeadEnrichmentRequest,
     LeadEnrichmentResponse,
     LeadExportRequest,
+    LeadDatabaseSnapshotResponse,
 )
 from app.leads.search_queries import generate_search_queries
 
@@ -113,16 +115,17 @@ def start_automated_search(
             "crawl_websites": request.crawl_websites,
         },
     )
-    background_tasks.add_task(
-        _run_automated_search,
-        user_id=current_user.uid,
-        job_id=job["id"],
-        list_id=lead_list["id"],
-        request=request,
-        lead_repository=lead_repository,
-        provider_repository=provider_repository,
-        job_repository=job_repository,
-    )
+    if get_settings().background_jobs_mode.lower() != "worker":
+        background_tasks.add_task(
+            _run_automated_search,
+            user_id=current_user.uid,
+            job_id=job["id"],
+            list_id=lead_list["id"],
+            request=request,
+            lead_repository=lead_repository,
+            provider_repository=provider_repository,
+            job_repository=job_repository,
+        )
     return AutomatedLeadSearchResponse(
         lead_list=LeadListResponse(**lead_list),
         job_id=job["id"],
@@ -222,6 +225,19 @@ async def import_lead_file(
     )
 
 
+@router.get("/leads/snapshot", response_model=LeadDatabaseSnapshotResponse)
+def lead_database_snapshot(
+    list_id: str | None = Query(default=None),
+    current_user: AuthenticatedUser = Depends(get_current_user),
+    repository: LeadRepository = Depends(get_lead_repository),
+) -> LeadDatabaseSnapshotResponse:
+    lists, leads = repository.database_snapshot(current_user.uid, list_id)
+    return LeadDatabaseSnapshotResponse(
+        lead_lists=[LeadListResponse(**row) for row in lists],
+        leads=[LeadResponse(**row) for row in leads],
+    )
+
+
 @router.get("/leads", response_model=list[LeadResponse])
 def read_leads(
     list_id: str | None = Query(default=None),
@@ -270,15 +286,16 @@ def enrich_leads(
             "target_titles": normalized.target_titles,
         },
     )
-    background_tasks.add_task(
-        _run_enrichment,
-        user_id=current_user.uid,
-        job_id=job["id"],
-        request=normalized,
-        lead_repository=lead_repository,
-        provider_repository=provider_repository,
-        job_repository=job_repository,
-    )
+    if get_settings().background_jobs_mode.lower() != "worker":
+        background_tasks.add_task(
+            _run_enrichment,
+            user_id=current_user.uid,
+            job_id=job["id"],
+            request=normalized,
+            lead_repository=lead_repository,
+            provider_repository=provider_repository,
+            job_repository=job_repository,
+        )
     return LeadEnrichmentResponse(job_id=job["id"], status="pending", selected_count=len(actual_ids))
 
 

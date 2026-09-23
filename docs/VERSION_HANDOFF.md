@@ -1,31 +1,73 @@
-# Project Handoff — Replies + Follow-ups + Analytics
+# Project Handoff
 
-## Stable foundation preserved
-- Auth: Firebase
-- Data: Turso
-- Automated discovery + public website crawling
-- Gemini/OpenAI BYOK
-- Prospeo/Apollo enrichment
+## Current product state
+
+The application is now production-architecture ready with:
+- Firebase authentication
+- Turso data persistence
+- automated lead discovery
+- AI cleanup
+- public website crawling
+- enrichment
 - Excel/CSV import/export
-- Hostinger/Gmail senders
-- Templates, campaigns, quick send, queue worker, suppression
+- Hostinger/Gmail sender architecture
+- templates/campaigns/quick send
+- follow-ups/replies/suppression/analytics
+- Admin operations
+- durable background workers
+- Render production Blueprint
+- performance optimizations
 
-## This bundle adds
-- multi-step campaign sequences
-- stop-on-reply
-- inbound reply persistence
-- Hostinger local inbox sync
-- Hostinger webhook-ready endpoint for deployed HTTPS API
-- reply classifications
-- campaign reply analytics
-- campaign detail/message history
-- failed-message retry
-- optimistic campaign/lead actions
-- frontend response cache
-- subtle motion
+## Current architecture
 
-## Required migration
-`003_replies_followups`
+```text
+React/Vite static frontend
+        ↓
+FastAPI API
+        ↓
+Turso database
+   ↙          ↘
+lead worker   outreach worker
+   ↓              ↓
+search/AI/       Hostinger/Gmail
+crawl/enrich
+```
 
-## Next major bundle
-Admin + production deployment + deeper performance optimization.
+## Local behavior
+
+`BACKGROUND_JOBS_MODE=inline` keeps Find Leads easy to test locally.
+
+Outreach still needs:
+```powershell
+python -m app.outreach.worker
+```
+for queued campaign sending.
+
+## Production behavior
+
+`BACKGROUND_JOBS_MODE=worker` means discovery/enrichment jobs are claimed by `lead-platform-lead-worker`.
+
+Outreach is processed by `lead-platform-outreach-worker`.
+
+## Admin
+
+Bootstrap admin access with backend `ADMIN_EMAILS`.
+
+## New migration
+
+`004_admin_operations`
+
+## Next/final planned bundle
+
+**Final UX + security + release polish**
+
+Do not redesign the completed architecture from scratch. Focus next on:
+- cohesive visual polish across every page
+- dashboard/home experience
+- accessibility/responsive details
+- loading/empty/error states
+- security hardening and abuse limits
+- pagination/large-list UX where useful
+- audit/history surfaces
+- final regression/e2e tests
+- final deployment/runbook polish

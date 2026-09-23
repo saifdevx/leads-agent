@@ -9,6 +9,8 @@ class FakeDatabase:
 
     def execute(self, sql, params=(), *, want_rows=True):
         self.calls.append((sql, params, want_rows))
+        if "FROM users" in sql and "WHERE firebase_uid" in sql:
+            return QueryResult([], [{"firebase_uid": params[0], "status": "active", "role": "user"}], 0, None, 1, 0)
         return QueryResult([], [], 1, None, 0, 1)
 
 
@@ -25,7 +27,7 @@ def test_user_sync_uses_firebase_uid_upsert():
 
     repository.sync_authenticated_user(user)
 
-    assert len(database.calls) == 1
+    assert len(database.calls) == 2
     sql, params, want_rows = database.calls[0]
     assert "INSERT INTO users" in sql
     assert "ON CONFLICT(firebase_uid) DO UPDATE" in sql

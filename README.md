@@ -4,34 +4,51 @@ A custom lead-generation and outreach web app built around a simple workflow:
 
 **Find leads → review/enrich/import/export → outreach → replies/follow-ups**
 
+The interface stays simple while provider adapters, durable jobs, workers, caching and operational controls run behind it.
+
 ## Current capabilities
 
+### Lead generation
 - Firebase authentication
 - Turso application database
-- Automated lead discovery via connected search providers
+- Automated discovery with Serper / Brave
 - Public website research
-- Gemini/OpenAI BYOK cleanup
-- Prospeo/Apollo BYOK enrichment
-- Excel/CSV import and export
-- Email templates
-- Hostinger Mail sender
-- Optional Gmail sender
-- Campaign preview + explicit approval
-- Persistent email queue + worker
-- Quick Send
-- Daily limits, configurable 20s+ interval, optional sending window
-- Pause/resume/cancel/delete campaign controls
-- Suppression list
-- Multi-step follow-up sequences
-- Reply Inbox + manual Hostinger reply sync for local development
-- Stop-on-reply
-- Interested / unsubscribe / out-of-office reply classification
-- Campaign reply analytics and message-level retry controls
-- Optimistic UI for common actions + short-lived frontend response cache
-- Bulk lead deletion with instant UI feedback
-- Subtle UI motion with reduced-motion support
+- Gemini / OpenAI BYOK cleanup
+- Prospeo / Apollo enrichment
+- Excel / CSV import and export
+- Deduplication, filtering and bulk actions
 
-## Local processes
+### Outreach
+- Email templates
+- Hostinger Agentic Mail sender
+- Optional Gmail sender
+- Quick Send
+- Campaign preview + explicit approval
+- Daily limits, 20s+ intervals and optional sending windows
+- Pause / resume / cancel / delete
+- Suppression list
+- Multi-step follow-ups
+- Reply inbox and reply classification
+- Stop-on-reply
+- Campaign analytics and failed-message retry
+- Hostinger live reply webhook support after production deployment
+
+### Operations / production
+- Admin-only dashboard
+- User suspension/reactivation
+- Job inspection and retry
+- Provider and worker health visibility
+- Durable lead-discovery and enrichment worker
+- Separate outreach worker
+- Production Render Blueprint
+- Worker heartbeats
+- Admin audit logging
+- User access-state cache
+- Persistent Turso HTTP connection pooling
+- Lead-page and Outreach-page snapshot APIs to reduce database round trips
+- Frontend in-flight request deduplication and short-lived caching
+
+## Local development
 
 Backend:
 ```powershell
@@ -46,11 +63,30 @@ cd frontend
 npm run dev
 ```
 
-Outreach worker:
+Outreach worker (required to actually send queued campaigns locally):
 ```powershell
 cd backend
 .venv\Scripts\Activate.ps1
 python -m app.outreach.worker
 ```
 
-See `docs/REPLIES_FOLLOWUPS_SETUP.md` for this bundle's update and test guide.
+Lead worker is **not required locally** while `BACKGROUND_JOBS_MODE=inline`. Production uses a dedicated lead worker.
+
+## Admin access
+
+Add your own Firebase login email to the backend `.env`:
+
+```env
+ADMIN_EMAILS=you@example.com
+```
+
+Restart the backend and sign in again. The **Admin** navigation item will appear after `/api/v1/auth/me` returns the admin role.
+
+## Production
+
+See:
+- `docs/PRODUCTION_DEPLOYMENT.md`
+- `docs/PERFORMANCE.md`
+- `docs/TEST_CHECKLIST.md`
+
+Two deployment profiles are included: `render.yaml` (recommended, separate lead + outreach workers) and `render-low-cost.yaml` (early low-cost mode with discovery running inline in the API).
