@@ -1,10 +1,13 @@
 import logging
 import time
 import uuid
+import threading
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.auth import router as auth_router
@@ -17,6 +20,8 @@ from app.api.outreach import router as outreach_router
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.providers.security import CredentialEncryptionError
+from app.jobs.worker import run_forever as run_lead_worker
+from app.outreach.worker import run_forever as run_outreach_worker
 from app.db.client import (
     DatabaseConfigurationError,
     DatabaseQueryError,
@@ -25,14 +30,37 @@ from app.db.client import (
 
 settings = get_settings()
 configure_logging(settings.log_level)
-logger = logging.getLogger("lead_platform.api")
+logger = logging.getLogger("lead_gen.api")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    stop_event = threading.Event()
+    threads: list[threading.Thread] = []
+    if settings.embedded_workers:
+        if settings.background_jobs_mode.lower() == "embedded":
+            threads.append(threading.Thread(target=run_lead_worker, kwargs={"stop_event": stop_event}, name="lead-worker", daemon=True))
+        threads.append(threading.Thread(target=run_outreach_worker, kwargs={"stop_event": stop_event}, name="outreach-worker", daemon=True))
+        for thread in threads:
+            thread.start()
+        logger.info("Embedded workers started: %s", ", ".join(thread.name for thread in threads))
+    try:
+        yield
+    finally:
+        stop_event.set()
+        for thread in threads:
+            thread.join(timeout=2.0)
+
 
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     docs_url="/docs" if settings.app_env != "production" else None,
     redoc_url=None,
+    lifespan=lifespan,
 )
+
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,6 +79,12 @@ async def request_context(request: Request, call_next):
 
     response = await call_next(request)
     response.headers["X-Request-ID"] = request_id
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    if settings.app_env == "production":
+        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
 
     logger.info(
         "%s %s -> %s in %.1fms",

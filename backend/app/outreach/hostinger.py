@@ -167,8 +167,8 @@ def create_webhook(api_token: str, mailbox_resource_id: str, url: str) -> dict:
             f"{BASE_URL}/api/v1/mailboxes/{mailbox_resource_id}/webhooks",
             headers=_headers(api_token),
             json={
-                "name": "Lead Platform replies",
-                "description": "Stop follow-ups and sync replies into Lead Platform",
+                "name": "Lead Gen replies",
+                "description": "Stop follow-ups and sync replies into Lead Gen",
                 "events": ["message.received"],
                 "status": "active",
                 "url": url,

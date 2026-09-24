@@ -1,1 +1,1 @@
-"""Database access for the Lead Platform."""
+"""Database access for the Lead Gen."""

@@ -1,20 +1,20 @@
-LEAD PLATFORM — ADMIN / PRODUCTION / PERFORMANCE BUNDLE
+LEAD GEN — FINAL RELEASE BUNDLE
 
 PURPOSE
-- Add production operations, admin control, durable workers and a deeper performance pass without redesigning the working lead/outreach product.
+- Finalize the working Lead Gen product with branding, UI polish, performance improvements, security hardening and a default zero-cost Render deployment.
 
-MAJOR ADDITIONS
-- backend/migrations/004_admin_operations.sql
-- backend/app/admin/
-- backend/app/api/admin.py
-- backend/app/jobs/worker.py
-- frontend/src/pages/AdminPage.tsx
-- production render.yaml
-- lower-cost render-low-cost.yaml
-- snapshot APIs for My Leads and Outreach
-- persistent Turso HTTP connection pooling
-- user access cache + frontend in-flight request dedupe
-- Hostinger live-webhook status/setup UI
+MAJOR ADDITIONS / CHANGES
+- Lead Gen branding across frontend/backend/docs/exports/webhooks
+- User-supplied logo assets, favicon, Apple touch icon and manifest
+- polished sidebar, top bar, auth experience, forms, tables and motion
+- empty default lead-search form (no demo data prefilled)
+- automatic retry for transient GET failures
+- one-round-trip authenticated-user Turso sync
+- API gzip + security headers
+- Quick Send rate limiting
+- free Render Blueprint with embedded lead/outreach workers
+- optional scaled Render Blueprint preserved as render-scaled.yaml
+- final deployment and release-checklist docs
 
 KEEP / NEVER OVERWRITE WITH THE ZIP
 - .git/
@@ -28,24 +28,21 @@ KEEP / NEVER OVERWRITE WITH THE ZIP
 - Turso / provider / Hostinger secrets
 
 DATABASE
-- Take a Turso backup/branch before applying to important data.
+- No new schema migration was added in this final polish bundle.
 - Run: python -m app.db.migrate
-- Expected new migration: 004_admin_operations
-- Run migration again; it should report up to date.
+- It should report that the schema is already up to date after your existing migrations are applied.
 
-LOCAL ADMIN
-- Add your own login email to backend/.env:
-  ADMIN_EMAILS=you@example.com
-- Restart backend and sign in again.
-
-TEST
+LOCAL TEST
 - Backend: pytest -q
 - Frontend: npm run check && npm run test && npm run build
-- Verify admin access, user controls, lead/outreach page speed, worker health and existing lead/outreach regression flows.
+- Run one lead search, export, Hostinger Quick Send, campaign, reply test and Admin health check.
 
-PRODUCTION
-- Follow docs/PRODUCTION_DEPLOYMENT.md.
+FREE DEPLOYMENT
+- Use the default render.yaml.
+- It creates a free Static Site plus one free Web Service.
+- The API runs embedded lead/outreach workers while awake.
+- Read docs/PRODUCTION_DEPLOYMENT.md for the free-tier sleep trade-off and exact environment variables.
 
 ROLLBACK
-- Preserve the previous working Git commit before updating.
-- Migration 004 is additive, but production data should still be backed up before applying it.
+- Preserve the previous working Git commit before replacing source files.
+- No destructive migration is introduced by this bundle.

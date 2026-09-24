@@ -33,17 +33,32 @@ function Workspace({ user, identity, onSignOut }: { user: User; identity: Authen
   const getToken = useCallback(() => user.getIdToken(), [user])
 
   useEffect(() => {
-    const controller = new AbortController()
-    const timer = window.setTimeout(() => controller.abort(), 4000)
+    let active = true
+    let controller: AbortController | null = null
 
-    getHealth(controller.signal)
-      .then(() => setHealth('online'))
-      .catch(() => setHealth('offline'))
-      .finally(() => window.clearTimeout(timer))
+    function checkHealth() {
+      controller?.abort()
+      controller = new AbortController()
+      const requestController = controller
+      const timer = window.setTimeout(() => requestController.abort(), 5000)
+      getHealth(requestController.signal)
+        .then(() => { if (active) setHealth('online') })
+        .catch(() => { if (active) setHealth('offline') })
+        .finally(() => window.clearTimeout(timer))
+    }
+
+    checkHealth()
+    // While the app is open, a lightweight health request keeps the free Render API
+    // responsive and gives embedded workers a chance to process queued work.
+    const interval = window.setInterval(checkHealth, 4 * 60 * 1000)
+    const onVisible = () => { if (document.visibilityState === 'visible') checkHealth() }
+    document.addEventListener('visibilitychange', onVisible)
 
     return () => {
-      controller.abort()
-      window.clearTimeout(timer)
+      active = false
+      controller?.abort()
+      window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', onVisible)
     }
   }, [])
 

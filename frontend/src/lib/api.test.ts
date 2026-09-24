@@ -9,7 +9,7 @@ describe('getHealth', () => {
   it('returns the structured health payload', async () => {
     const payload = {
       status: 'ok' as const,
-      service: 'lead-platform-api',
+      service: 'lead-gen-api',
       version: '0.5.0',
       environment: 'test',
       timestamp: '2026-09-17T00:00:00Z',

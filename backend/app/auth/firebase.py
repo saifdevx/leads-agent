@@ -9,7 +9,7 @@ from google.auth.exceptions import DefaultCredentialsError
 
 from app.core.config import get_settings
 
-logger = logging.getLogger("lead_platform.auth")
+logger = logging.getLogger("lead_gen.auth")
 
 
 class FirebaseConfigurationError(RuntimeError):

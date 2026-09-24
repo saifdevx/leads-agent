@@ -12,7 +12,7 @@ Prefer **Selected mailboxes** and choose only the sender mailbox you plan to use
 
 Copy the token when Hostinger shows it. Do not put it in `.env`, source code, or Git.
 
-## 2. Connect it inside Lead Platform
+## 2. Connect it inside Lead Gen
 
 Start the normal backend/frontend, then open:
 

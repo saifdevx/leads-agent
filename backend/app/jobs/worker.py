@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import os
 import socket
+import threading
 import time
 import uuid
 
@@ -52,7 +53,7 @@ def _run_job(job: dict, jobs: JobRepository) -> None:
     jobs.fail(user_id, job_id, f"Unsupported background job type: {job['job_type']}")
 
 
-def main() -> None:
+def run_forever(*, stop_event: threading.Event | None = None, close_database: bool = False) -> None:
     settings = get_settings()
     database = get_database_client()
     jobs = JobRepository(database)
@@ -60,12 +61,12 @@ def main() -> None:
     worker_id = _worker_id()
     poll_seconds = max(1.0, float(settings.worker_poll_seconds))
 
-    print(f"Lead worker started ({worker_id}). Press Ctrl+C to stop.", flush=True)
+    print(f"Lead worker started ({worker_id}).", flush=True)
     last_heartbeat = 0.0
     last_stale_release = 0.0
 
     try:
-        while True:
+        while stop_event is None or not stop_event.is_set():
             now_mono = time.monotonic()
             if now_mono - last_heartbeat >= 20:
                 try:
@@ -85,11 +86,17 @@ def main() -> None:
                 job = jobs.claim_next(worker_id)
             except Exception as exc:
                 print(f"Could not claim job: {exc}", flush=True)
-                time.sleep(poll_seconds)
+                if stop_event:
+                    stop_event.wait(poll_seconds)
+                else:
+                    time.sleep(poll_seconds)
                 continue
 
             if not job:
-                time.sleep(poll_seconds)
+                if stop_event:
+                    stop_event.wait(poll_seconds)
+                else:
+                    time.sleep(poll_seconds)
                 continue
 
             try:
@@ -103,7 +110,12 @@ def main() -> None:
     except KeyboardInterrupt:
         print("Lead worker stopped.", flush=True)
     finally:
-        database.close()
+        if close_database:
+            database.close()
+
+
+def main() -> None:
+    run_forever(close_database=True)
 
 
 if __name__ == "__main__":

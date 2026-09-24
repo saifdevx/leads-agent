@@ -119,4 +119,4 @@ Email sending also needs an always-on **Background Worker** with:
 - Start command: `python -m app.outreach.worker`
 - Same Firebase/Turso/encryption/Gmail environment variables as the backend API
 
-A background worker may require a paid Render compute plan. Do not deploy the worker until you are ready to send production mail.
+The default free Render deployment runs the outreach worker inside the API process while the service is awake. Scheduled messages can be delayed if the free API is asleep; the optional scaled deployment uses a separate always-on worker.

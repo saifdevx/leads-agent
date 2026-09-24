@@ -22,7 +22,7 @@ def health(request: Request) -> HealthResponse:
     settings = get_settings()
     return HealthResponse(
         status="ok",
-        service="lead-platform-api",
+        service="lead-gen-api",
         version=settings.app_version,
         environment=settings.app_env,
         timestamp=datetime.now(UTC).isoformat(),

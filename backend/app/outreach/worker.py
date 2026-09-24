@@ -4,6 +4,7 @@ import os
 import socket
 import time
 import uuid
+import threading
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -122,13 +123,13 @@ def process_once() -> int:
     return processed
 
 
-def main() -> None:
+def run_forever(*, stop_event: threading.Event | None = None) -> None:
     repository = get_outreach_repository()
     admin = AdminRepository(repository.database)
     worker_id = f"{socket.gethostname()}-{os.getpid()}-{uuid.uuid4().hex[:8]}"
-    print(f"Outreach worker started ({worker_id}). Press Ctrl+C to stop.", flush=True)
+    print(f"Outreach worker started ({worker_id}).", flush=True)
     last_heartbeat = 0.0
-    while True:
+    while stop_event is None or not stop_event.is_set():
         try:
             now_mono = time.monotonic()
             if now_mono - last_heartbeat >= 20:
@@ -142,7 +143,14 @@ def main() -> None:
             break
         except Exception as exc:
             print(f"Worker iteration failed: {exc}", flush=True)
-        time.sleep(5)
+        if stop_event:
+            stop_event.wait(5)
+        else:
+            time.sleep(5)
+
+
+def main() -> None:
+    run_forever()
 
 
 if __name__ == "__main__":

@@ -24,9 +24,9 @@ type Props = {
 type Mode = 'automatic' | 'manual'
 
 export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) {
-  const [niche, setNiche] = useState('Solar panel installers')
-  const [location, setLocation] = useState('Texas, USA')
-  const [targetCount, setTargetCount] = useState(100)
+  const [niche, setNiche] = useState('')
+  const [location, setLocation] = useState('')
+  const [targetCount, setTargetCount] = useState(50)
   const [mode, setMode] = useState<Mode>('automatic')
   const [advanced, setAdvanced] = useState(false)
   const [searchProvider, setSearchProvider] = useState<'auto' | 'serper' | 'brave'>('auto')
@@ -250,7 +250,7 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
         <div className="mt-8 grid gap-5 sm:grid-cols-2">
           <label className="sm:col-span-2">
             <span className="mb-2 block text-[13px] font-semibold text-[#2E3039]">Business or niche</span>
-            <input className="focus-ring h-12 w-full rounded-[10px] border border-[#DCDDE5] bg-white px-4 text-[15px]" value={niche} disabled={Boolean(busy)} onChange={(event) => setNiche(event.target.value)} />
+            <input className="focus-ring h-12 w-full rounded-[10px] border border-[#DCDDE5] bg-white px-4 text-[15px]" value={niche} disabled={Boolean(busy)} onChange={(event) => setNiche(event.target.value)} placeholder="e.g. Solar installers, dentists, HVAC companies" />
           </label>
           <label>
             <span className="mb-2 block text-[13px] font-semibold text-[#2E3039]">Location</span>

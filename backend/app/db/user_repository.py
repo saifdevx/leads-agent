@@ -11,9 +11,10 @@ class UserRepository:
         self.database = database
 
     def sync_authenticated_user(self, user: AuthenticatedUser, *, role_hint: str = "user") -> dict:
+        """Upsert and return the application user in one Turso round-trip."""
         now = datetime.now(timezone.utc).isoformat()
         role = "admin" if role_hint == "admin" else "user"
-        self.database.execute(
+        result = self.database.execute(
             """
             INSERT INTO users (
                 firebase_uid,
@@ -35,6 +36,7 @@ class UserRepository:
                 role = CASE WHEN users.role = 'admin' OR excluded.role = 'admin' THEN 'admin' ELSE users.role END,
                 updated_at = excluded.updated_at,
                 last_login_at = excluded.last_login_at
+            RETURNING firebase_uid,email,display_name,email_verified,sign_in_provider,status,role,created_at,updated_at,last_login_at
             """,
             (
                 user.uid,
@@ -47,9 +49,11 @@ class UserRepository:
                 now,
                 now,
             ),
-            want_rows=False,
+            want_rows=True,
         )
-        return self.get_by_firebase_uid(user.uid) or {
+        if result.rows:
+            return result.rows[0]
+        return {
             "firebase_uid": user.uid,
             "email": user.email,
             "display_name": user.name,
@@ -57,6 +61,9 @@ class UserRepository:
             "sign_in_provider": user.sign_in_provider,
             "status": "active",
             "role": role,
+            "created_at": now,
+            "updated_at": now,
+            "last_login_at": now,
         }
 
     def get_by_firebase_uid(self, firebase_uid: str) -> dict | None:

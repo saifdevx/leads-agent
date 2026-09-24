@@ -86,8 +86,8 @@ def export_xlsx(rows: list[dict], *, title: str = "Leads") -> bytes:
     workbook = xlsxwriter.Workbook(output, {"in_memory": True})
     workbook.set_properties({
         "title": f"{title} lead export",
-        "subject": "Lead Platform export",
-        "author": "Lead Platform",
+        "subject": "Lead Gen export",
+        "author": "Lead Gen",
     })
 
     header = workbook.add_format({

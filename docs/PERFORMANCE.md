@@ -116,3 +116,16 @@ The final polish pass can add profiling-driven improvements if real production m
 - additional read caching for stable configuration
 
 Avoid adding Redis or another infrastructure service until production measurements prove it is necessary.
+
+## Final release optimizations
+
+The final release adds several additional latency reductions:
+
+- Firebase application-user sync now uses a single Turso `UPSERT ... RETURNING` call instead of an upsert followed by a select.
+- Authenticated GET requests automatically retry one transient 502/503/504 or network failure after a short delay.
+- User access state is cached for 60 seconds by default; admin suspension/reactivation explicitly invalidates the affected cache entry.
+- The free Render deployment uses one web process with embedded workers, avoiding network/service hops between API and background worker processes during personal-use deployments.
+- API responses larger than 1 KB are gzip compressed.
+- While the browser is open, Lead Gen checks `/health` periodically so a free Render API stays responsive during active work.
+
+The database remains the source of truth. Client caches are short-lived and mutation paths invalidate or optimistically reconcile relevant state.

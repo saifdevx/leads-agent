@@ -351,7 +351,7 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1180px] border-collapse text-left">
+            <table className="table-sticky w-full min-w-[1180px] border-collapse text-left">
               <thead className="bg-[#F8F8FA] text-[11px] font-bold uppercase tracking-[0.07em] text-[#777A87]">
                 <tr>
                   <th className="w-12 px-5 py-3.5"><input aria-label="Select all visible leads" type="checkbox" checked={allFilteredSelected} onChange={toggleAllFiltered} /></th>

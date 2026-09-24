@@ -1,73 +1,44 @@
-# Project Handoff
+# Lead Gen — Handoff
 
-## Current product state
+## What works
 
-The application is now production-architecture ready with:
-- Firebase authentication
-- Turso data persistence
-- automated lead discovery
-- AI cleanup
-- public website crawling
-- enrichment
-- Excel/CSV import/export
-- Hostinger/Gmail sender architecture
-- templates/campaigns/quick send
-- follow-ups/replies/suppression/analytics
-- Admin operations
-- durable background workers
-- Render production Blueprint
-- performance optimizations
+Authentication, automated discovery, lead management, enrichment, imports/exports,
+Hostinger outreach, templates, campaigns, follow-ups, replies, analytics, admin and
+free Render deployment support are implemented.
 
-## Current architecture
+## Architecture
 
-```text
-React/Vite static frontend
-        ↓
-FastAPI API
-        ↓
-Turso database
-   ↙          ↘
-lead worker   outreach worker
-   ↓              ↓
-search/AI/       Hostinger/Gmail
-crawl/enrich
-```
+- React/Vite frontend
+- FastAPI backend
+- Firebase auth
+- Turso database
+- Provider adapters
+- Durable jobs
+- Hostinger/Gmail sender adapters
 
-## Local behavior
+## Background processing
 
-`BACKGROUND_JOBS_MODE=inline` keeps Find Leads easy to test locally.
+Local default:
+- `BACKGROUND_JOBS_MODE=inline`
+- run `python -m app.outreach.worker` separately
 
-Outreach still needs:
-```powershell
-python -m app.outreach.worker
-```
-for queued campaign sending.
+Free Render default:
+- `BACKGROUND_JOBS_MODE=embedded`
+- `EMBEDDED_WORKERS=true`
+- both durable workers run inside the API process while the service is awake
 
-## Production behavior
+Scaled deployment:
+- use `render-scaled.yaml`
+- separate API, lead worker and outreach worker
 
-`BACKGROUND_JOBS_MODE=worker` means discovery/enrichment jobs are claimed by `lead-platform-lead-worker`.
+## Preserve
 
-Outreach is processed by `lead-platform-outreach-worker`.
+- `.git/`
+- real `.env` files
+- local virtual environments
+- `CREDENTIAL_ENCRYPTION_KEY`
+- production data
 
-## Admin
+## Final validation
 
-Bootstrap admin access with backend `ADMIN_EMAILS`.
-
-## New migration
-
-`004_admin_operations`
-
-## Next/final planned bundle
-
-**Final UX + security + release polish**
-
-Do not redesign the completed architecture from scratch. Focus next on:
-- cohesive visual polish across every page
-- dashboard/home experience
-- accessibility/responsive details
-- loading/empty/error states
-- security hardening and abuse limits
-- pagination/large-list UX where useful
-- audit/history surfaces
-- final regression/e2e tests
-- final deployment/runbook polish
+Use `docs/FINAL_RELEASE_CHECKLIST.md` before deployment.

@@ -32,7 +32,7 @@ PUBLIC_API_URL=
 Example after deployment:
 
 ```env
-PUBLIC_API_URL=https://lead-platform-api.onrender.com
+PUBLIC_API_URL=https://lead-gen-api.onrender.com
 ```
 
 This is used to create a real-time Hostinger reply webhook. Local development does not need it because the Reply Inbox has a manual **Sync Hostinger replies** action.

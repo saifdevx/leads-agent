@@ -4,8 +4,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_name: str = "Lead Platform API"
-    app_version: str = "0.11.0"
+    app_name: str = "Lead Gen API"
+    app_version: str = "1.0.0"
     app_env: str = "development"
     cors_origins: str = "http://localhost:5173"
     log_level: str = "INFO"
@@ -25,7 +25,9 @@ class Settings(BaseSettings):
     background_jobs_mode: str = "inline"
     worker_poll_seconds: float = 3.0
     worker_lease_seconds: int = 300
-    user_access_cache_seconds: int = 30
+    user_access_cache_seconds: int = 60
+    embedded_workers: bool = False
+    quick_send_per_minute: int = 6
 
     model_config = SettingsConfigDict(
         env_file=".env",

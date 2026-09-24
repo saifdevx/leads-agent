@@ -2,6 +2,9 @@ from __future__ import annotations
 
 import re
 import secrets
+import threading
+import time
+from collections import deque
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -47,6 +50,23 @@ from app.outreach.schemas import (
 )
 
 router = APIRouter(prefix="/api/v1/outreach", tags=["outreach"])
+
+
+_quick_send_events: dict[str, deque[float]] = {}
+_quick_send_lock = threading.Lock()
+
+
+def _check_quick_send_rate(user_id: str) -> None:
+    limit = max(1, int(get_settings().quick_send_per_minute))
+    now = time.monotonic()
+    cutoff = now - 60
+    with _quick_send_lock:
+        events = _quick_send_events.setdefault(user_id, deque())
+        while events and events[0] < cutoff:
+            events.popleft()
+        if len(events) >= limit:
+            raise HTTPException(429, f"Quick Send is limited to {limit} messages per minute. Please wait a moment and try again.")
+        events.append(now)
 
 
 def _template(row):
@@ -392,6 +412,7 @@ def quick_send(data: QuickSendRequest, current_user: AuthenticatedUser = Depends
         raise HTTPException(400, "Enter a valid recipient email address.")
     if repo.is_suppressed(current_user.uid, to_email):
         raise HTTPException(400, "This address is on your suppression list.")
+    _check_quick_send_rate(current_user.uid)
     try:
         sender = repo.get_sender(current_user.uid, data.sender_id)
         provider_id = send_with_sender(repo, user_id=current_user.uid, sender_id=data.sender_id, to_email=to_email, subject=data.subject.strip(), body=data.body)

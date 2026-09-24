@@ -116,8 +116,8 @@ export function OutreachPage({ getToken, initialLeadIds, onClearInitialLeadIds, 
 
   const [quickSenderId, setQuickSenderId] = useState('')
   const [quickTo, setQuickTo] = useState('')
-  const [quickSubject, setQuickSubject] = useState('Test from Lead Platform')
-  const [quickBody, setQuickBody] = useState('This is a test message from Lead Platform.')
+  const [quickSubject, setQuickSubject] = useState('Test from Lead Gen')
+  const [quickBody, setQuickBody] = useState('This is a test message from Lead Gen.')
   const [quickSending, setQuickSending] = useState(false)
   const [suppressAddress, setSuppressAddress] = useState('')
 

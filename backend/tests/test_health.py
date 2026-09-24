@@ -12,7 +12,7 @@ def test_health_endpoint_returns_structured_payload():
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "ok"
-    assert data["service"] == "lead-platform-api"
+    assert data["service"] == "lead-gen-api"
     assert data["version"] == get_settings().app_version
     assert data["request_id"]
     assert response.headers["X-Request-ID"] == data["request_id"]

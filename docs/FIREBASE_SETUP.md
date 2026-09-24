@@ -5,7 +5,7 @@ This application uses Firebase Authentication in the browser and Firebase Admin 
 ## A. Create or choose a Firebase project
 
 1. Open Firebase Console.
-2. Create a project, or select the project you want to use for Lead Platform.
+2. Create a project, or select the project you want to use for Lead Gen.
 3. You do not need Firestore, Realtime Database, or Firebase Storage for this application.
 
 ## B. Enable authentication methods
@@ -24,7 +24,7 @@ Do not enable phone/SMS authentication for this application.
 1. Open **Project settings** (gear icon).
 2. Under **General**, find **Your apps**.
 3. Add a **Web app** if one does not exist.
-4. Give it a name such as `Lead Platform Web`.
+4. Give it a name such as `Lead Gen Web`.
 5. Firebase will show a configuration object similar to:
 
 ```js
@@ -64,7 +64,7 @@ After editing `frontend/.env`, restart Vite.
 Recommended local layout:
 
 ```text
-D:\Leads-Agent\secrets\lead-platform-firebase-admin.json
+D:\Leads-Agent\secrets\lead-gen-firebase-admin.json
 D:\Leads-Agent\leads-agent\   <-- Git repository
 ```
 
@@ -73,14 +73,14 @@ Do not place the key inside `frontend/`, `backend/`, or any committed project fo
 Update `backend/.env`:
 
 ```env
-APP_NAME=Lead Platform API
+APP_NAME=Lead Gen API
 APP_VERSION=<use the value from backend/.env.example>
 APP_ENV=development
 CORS_ORIGINS=http://localhost:5173
 LOG_LEVEL=INFO
 
 FIREBASE_PROJECT_ID=your-firebase-project-id
-FIREBASE_CREDENTIALS_PATH=D:/Leads-Agent/secrets/lead-platform-firebase-admin.json
+FIREBASE_CREDENTIALS_PATH=D:/Leads-Agent/secrets/lead-gen-firebase-admin.json
 FIREBASE_SERVICE_ACCOUNT_JSON=
 ```
 

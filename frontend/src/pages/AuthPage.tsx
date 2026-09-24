@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { getAuthErrorMessage } from '../auth/errors'
 import { useAuth } from '../auth/AuthContext'
 import { Icon } from '../components/Icon'
+import { BrandLockup, BrandMark } from '../components/Brand'
 
 type Mode = 'login' | 'register'
 
@@ -83,12 +84,14 @@ export function AuthPage() {
     <main className="min-h-screen bg-[#F7F7FA] px-4 py-8 sm:px-6 lg:grid lg:grid-cols-[minmax(320px,0.82fr)_minmax(540px,1.18fr)] lg:p-0">
       <section className="hidden min-h-screen bg-[#14151C] p-10 text-white lg:flex lg:flex-col lg:justify-between xl:p-14">
         <div>
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 place-items-center rounded-[10px] bg-[#7B61FF] font-display text-sm font-extrabold">LP</div>
-            <div className="font-display text-base font-bold">Lead Platform</div>
-          </div>
+          <BrandLockup light subtitle="AI lead discovery & outreach" />
 
-          <div className="mt-24 max-w-[480px]">
+          <div className="relative mt-20 max-w-[500px]">
+            <div className="pointer-events-none absolute -left-24 -top-20 h-72 w-72 rounded-full bg-[#7B61FF]/14 blur-3xl" />
+            <div className="pointer-events-none absolute -bottom-28 left-44 h-56 w-56 rounded-full bg-[#BCE953]/10 blur-3xl" />
+            <div className="relative mb-8 inline-flex rounded-[18px] border border-white/10 bg-white/[0.055] p-3 shadow-2xl shadow-black/20">
+              <BrandMark className="h-20 w-20" alt="Lead Gen" />
+            </div>
             <div className="text-xs font-bold uppercase tracking-[0.14em] text-[#B39CFF]">Simple lead generation</div>
             <h1 className="mt-4 font-display text-[44px] font-bold leading-[1.08] tracking-[-0.045em]">Find the right businesses. Keep the process simple.</h1>
             <p className="mt-5 max-w-[430px] text-[15px] leading-7 text-white/58">Research, organize, and contact leads from one focused workspace. Advanced systems stay behind the interface until you need them.</p>
@@ -107,10 +110,7 @@ export function AuthPage() {
 
       <section className="flex min-h-[calc(100vh-4rem)] items-center justify-center lg:min-h-screen">
         <div className="w-full max-w-[460px]">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <div className="grid h-9 w-9 place-items-center rounded-[10px] bg-[#7B61FF] font-display text-xs font-extrabold text-white">LP</div>
-            <div className="font-display text-[15px] font-bold text-[#14151C]">Lead Platform</div>
-          </div>
+          <div className="mb-8 lg:hidden"><BrandLockup compact subtitle="AI lead discovery & outreach" /></div>
 
           <div className="card-surface rounded-[16px] p-5 sm:p-8">
             <div>

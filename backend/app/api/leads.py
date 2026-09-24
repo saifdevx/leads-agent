@@ -115,7 +115,7 @@ def start_automated_search(
             "crawl_websites": request.crawl_websites,
         },
     )
-    if get_settings().background_jobs_mode.lower() != "worker":
+    if get_settings().background_jobs_mode.lower() not in {"worker", "embedded"}:
         background_tasks.add_task(
             _run_automated_search,
             user_id=current_user.uid,
@@ -286,7 +286,7 @@ def enrich_leads(
             "target_titles": normalized.target_titles,
         },
     )
-    if get_settings().background_jobs_mode.lower() != "worker":
+    if get_settings().background_jobs_mode.lower() not in {"worker", "embedded"}:
         background_tasks.add_task(
             _run_enrichment,
             user_id=current_user.uid,

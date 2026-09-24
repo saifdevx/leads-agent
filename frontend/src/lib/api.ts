@@ -141,11 +141,33 @@ async function authRequest<T>(path: string, idToken: string, init: RequestInit =
   headers.set('Authorization', `Bearer ${idToken}`)
   if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
 
-  const response = await fetch(`${API_URL}${path}`, { ...init, headers })
-  if (!response.ok) {
-    throw await readError(response, `Request failed with status ${response.status}`)
+  const method = (init.method || 'GET').toUpperCase()
+  const attempts = method === 'GET' ? 2 : 1
+  let lastResponse: Response | null = null
+  let lastNetworkError: unknown = null
+
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    try {
+      const response = await fetch(`${API_URL}${path}`, { ...init, headers })
+      lastResponse = response
+      if (response.ok) return response.json() as Promise<T>
+      if (attempt + 1 < attempts && [502, 503, 504].includes(response.status)) {
+        await new Promise((resolve) => window.setTimeout(resolve, 300))
+        continue
+      }
+      throw await readError(response, `Request failed with status ${response.status}`)
+    } catch (error) {
+      if (error instanceof ApiRequestError) throw error
+      lastNetworkError = error
+      if (attempt + 1 < attempts) {
+        await new Promise((resolve) => window.setTimeout(resolve, 300))
+        continue
+      }
+    }
   }
-  return response.json() as Promise<T>
+
+  if (lastResponse) throw await readError(lastResponse, `Request failed with status ${lastResponse.status}`)
+  throw lastNetworkError instanceof Error ? lastNetworkError : new Error('The API request could not be completed.')
 }
 
 export async function getHealth(signal?: AbortSignal): Promise<HealthResponse> {
