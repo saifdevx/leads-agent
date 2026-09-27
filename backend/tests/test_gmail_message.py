@@ -11,3 +11,16 @@ def test_build_raw_message_contains_expected_headers_and_body():
     assert msg["To"] == "to@example.com"
     assert msg["Subject"] == "Hello"
     assert "Test body" in decoded.decode()
+
+
+def test_build_raw_message_contains_html_alternative():
+    raw = build_raw_message(
+        sender_email="from@example.com", to_email="to@example.com", subject="Hello",
+        body="Plain body", html_body="<strong>HTML body</strong>",
+    )
+    decoded = base64.urlsafe_b64decode(raw + "=" * (-len(raw) % 4))
+    msg = message_from_bytes(decoded)
+    assert msg.is_multipart()
+    payload = msg.get_payload()
+    assert any(part.get_content_type() == "text/plain" for part in payload)
+    assert any(part.get_content_type() == "text/html" for part in payload)

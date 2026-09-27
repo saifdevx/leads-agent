@@ -28,6 +28,7 @@ from app.outreach.hostinger import (
 from app.outreach.oauth import authorization_url, make_state, verify_state
 from app.outreach.repository import OutreachNotFoundError, OutreachRepository
 from app.outreach.sending import send_with_sender
+from app.outreach.rendering import unsupported_tokens
 from app.outreach.schemas import (
     CampaignCreate,
     CampaignCreateResponse,
@@ -96,13 +97,22 @@ def templates(current_user: AuthenticatedUser = Depends(get_current_user), repo:
     return [_template(row) for row in repo.list_templates(current_user.uid)]
 
 
+def _validate_template_variables(data: TemplateCreate) -> None:
+    unknown = unsupported_tokens(f"{data.subject}\n{data.body}")
+    if unknown:
+        shown = ", ".join(f"{{{{{item}}}}}" for item in unknown[:8])
+        raise HTTPException(400, f"Unsupported template variable(s): {shown}. Use the smart variables shown in the template editor.")
+
+
 @router.post("/templates", response_model=TemplateResponse)
 def create_template(data: TemplateCreate, current_user: AuthenticatedUser = Depends(get_current_user), repo: OutreachRepository = Depends(get_outreach_repository)):
+    _validate_template_variables(data)
     return _template(repo.save_template(current_user.uid, data))
 
 
 @router.put("/templates/{template_id}", response_model=TemplateResponse)
 def update_template(template_id: str, data: TemplateCreate, current_user: AuthenticatedUser = Depends(get_current_user), repo: OutreachRepository = Depends(get_outreach_repository)):
+    _validate_template_variables(data)
     try:
         return _template(repo.save_template(current_user.uid, data, template_id))
     except OutreachNotFoundError as exc:

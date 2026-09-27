@@ -36,16 +36,18 @@ def user_info(access_token: str) -> dict:
         raise GmailError("Could not read the connected Google account profile.")
     return response.json()
 
-def build_raw_message(*, sender_email: str, to_email: str, subject: str, body: str) -> str:
+def build_raw_message(*, sender_email: str, to_email: str, subject: str, body: str, html_body: str | None = None) -> str:
     message = EmailMessage()
     message["From"] = sender_email
     message["To"] = to_email
     message["Subject"] = subject
     message.set_content(body)
+    if html_body:
+        message.add_alternative(html_body, subtype="html")
     return base64.urlsafe_b64encode(message.as_bytes()).decode().rstrip("=")
 
-def send_message(*, access_token: str, sender_email: str, to_email: str, subject: str, body: str) -> str:
-    raw = build_raw_message(sender_email=sender_email, to_email=to_email, subject=subject, body=body)
+def send_message(*, access_token: str, sender_email: str, to_email: str, subject: str, body: str, html_body: str | None = None) -> str:
+    raw = build_raw_message(sender_email=sender_email, to_email=to_email, subject=subject, body=body, html_body=html_body)
     response = httpx.post(
         "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
         headers={"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"},

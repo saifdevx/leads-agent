@@ -95,9 +95,10 @@ def send_message(
     to_email: str,
     subject: str,
     body: str,
+    html_body: str | None = None,
     display_name: str | None = None,
 ) -> str:
-    """Send a plain-text message using Hostinger Agentic Mail.
+    """Send a message using Hostinger Agentic Mail with plain-text fallback and optional HTML.
 
     Hostinger currently returns 204 No Content for a successful send, so there is no
     provider message ID to persist. We return a stable provider marker instead.
@@ -107,6 +108,8 @@ def send_message(
         "subject": subject,
         "text": body,
     }
+    if html_body:
+        request_body["html"] = html_body
     if display_name:
         request_body["displayName"] = display_name
 

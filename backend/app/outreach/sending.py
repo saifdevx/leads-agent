@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from app.core.config import get_settings
 from app.outreach.gmail import GmailError, refresh_access_token, send_message as send_gmail_message
 from app.outreach.hostinger import HostingerMailError, send_message as send_hostinger_message
+from app.outreach.rendering import prepare_email_content
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -37,6 +38,7 @@ def ensure_gmail_access_token(repository, user_id: str, sender_id: str, credenti
 
 def send_with_sender(repository, *, user_id: str, sender_id: str, to_email: str, subject: str, body: str) -> str:
     sender = repository.get_sender(user_id, sender_id, with_credentials=True)
+    plain_body, html_body = prepare_email_content(body)
     provider = str(sender.get("provider") or "gmail").lower()
     if provider == "hostinger":
         credentials = sender["credentials"]
@@ -49,7 +51,8 @@ def send_with_sender(repository, *, user_id: str, sender_id: str, to_email: str,
             mailbox_resource_id=mailbox_resource_id,
             to_email=to_email,
             subject=subject,
-            body=body,
+            body=plain_body,
+            html_body=html_body,
             display_name=sender.get("display_name"),
         )
     if provider == "gmail":
@@ -59,6 +62,7 @@ def send_with_sender(repository, *, user_id: str, sender_id: str, to_email: str,
             sender_email=sender["email"],
             to_email=to_email,
             subject=subject,
-            body=body,
+            body=plain_body,
+            html_body=html_body,
         )
     raise RuntimeError(f"Unsupported sender provider: {provider}")

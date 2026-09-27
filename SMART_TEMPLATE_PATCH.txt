@@ -1,0 +1,37 @@
+LEAD GEN — SMART TEMPLATE / RICH EMAIL PATCH
+
+PURPOSE
+- Fix unresolved {{Business Name}} placeholders.
+- Send <br>/<strong>/<a> as formatted HTML instead of literal text.
+- Infer missing business names conservatively from existing lead evidence.
+
+REPLACE
+- backend/app/outreach/rendering.py
+- backend/app/outreach/sending.py
+- backend/app/outreach/hostinger.py
+- backend/app/outreach/gmail.py
+- backend/app/api/outreach.py
+- frontend/src/pages/OutreachPage.tsx
+- backend/tests/test_outreach_rendering.py
+- backend/tests/test_hostinger_mail.py
+- backend/tests/test_gmail_message.py
+
+ADD
+- docs/SMART_TEMPLATES.md
+
+DATABASE
+- No migration.
+
+DEPENDENCIES
+- No new dependency.
+
+TEST
+- pytest -q
+- npm run check
+- npm run test
+- npm run build
+- Create a new 1-recipient campaign and verify preview + delivered formatting.
+
+IMPORTANT
+- Existing campaigns were already rendered when they were created. Recreate old campaign drafts after deploying this patch.
+- Keep backend/.env, frontend/.env and CREDENTIAL_ENCRYPTION_KEY unchanged.

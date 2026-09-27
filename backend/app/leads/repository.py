@@ -229,13 +229,14 @@ class LeadRepository:
         placeholders = ",".join("?" for _ in clean_ids)
         result = self.database.execute(
             f"""
-            SELECT id, list_id, company_name, website, domain, first_name, last_name,
-                   job_title, email, email_status, phone, linkedin_url, instagram_url,
-                   facebook_url, city, region, country, source, source_url, source_query,
-                   score, status, created_at, updated_at
-            FROM leads
-            WHERE user_id = ? AND id IN ({placeholders})
-            ORDER BY created_at DESC
+            SELECT l.id, l.list_id, l.company_name, l.website, l.domain, l.first_name, l.last_name,
+                   l.job_title, l.email, l.email_status, l.phone, l.linkedin_url, l.instagram_url,
+                   l.facebook_url, l.city, l.region, l.country, l.source, l.source_url, l.source_query,
+                   l.score, l.status, l.created_at, l.updated_at, ll.niche AS niche, ll.location AS list_location
+            FROM leads l
+            LEFT JOIN lead_lists ll ON ll.id = l.list_id AND ll.user_id = l.user_id
+            WHERE l.user_id = ? AND l.id IN ({placeholders})
+            ORDER BY l.created_at DESC
             """,
             (user_id, *clean_ids),
         )

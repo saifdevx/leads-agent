@@ -63,3 +63,17 @@ def test_invalid_token_returns_readable_error(monkeypatch):
         assert 'rejected this API token' in str(exc)
     else:
         raise AssertionError('expected HostingerMailError')
+
+
+def test_send_message_includes_html_when_provided(monkeypatch):
+    captured = {}
+    def fake_post(url, headers, json, timeout):
+        captured.update(url=url, headers=headers, json=json)
+        return FakeResponse(204)
+    monkeypatch.setattr(httpx, 'post', fake_post)
+    send_message(
+        api_token='token-value', mailbox_resource_id='AC123', to_email='lead@example.com',
+        subject='Hello', body='Plain fallback', html_body='<strong>HTML</strong>', display_name='Example Co',
+    )
+    assert captured['json']['text'] == 'Plain fallback'
+    assert captured['json']['html'] == '<strong>HTML</strong>'
