@@ -60,7 +60,7 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
       .then((token) => getLeadDatabaseSnapshot(token, selectedList === 'all' ? undefined : selectedList, refreshKey > 0))
       .then((snapshot) => {
         if (!active) return
-        setLists(snapshot.lead_lists)
+        setLists(snapshot.lead_lists.filter((list) => list.lead_count > 0 || list.status === 'searching'))
         setLeads(snapshot.leads)
         setSelectedIds(new Set())
       })
@@ -223,7 +223,18 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
       const token = await getToken()
       const deleted = await deleteLeads(token, ids)
       setNotice(`Deleted ${deleted} lead${deleted === 1 ? '' : 's'}.`)
-      setLists((current) => current.map((list) => ({ ...list, lead_count: Math.max(0, list.lead_count - ids.filter((id) => previous.find((lead) => lead.id === id && lead.list_id === list.id)).length) })))
+      setLists((current) => {
+        const next = current
+          .map((list) => ({
+            ...list,
+            lead_count: Math.max(0, list.lead_count - ids.filter((id) => previous.find((lead) => lead.id === id && lead.list_id === list.id)).length),
+          }))
+          .filter((list) => list.lead_count > 0 || list.status === 'searching')
+        if (selectedList !== 'all' && !next.some((list) => list.id === selectedList)) {
+          setSelectedList('all')
+        }
+        return next
+      })
     } catch (nextError) {
       setLeads(previous)
       setSelectedIds(new Set(ids))

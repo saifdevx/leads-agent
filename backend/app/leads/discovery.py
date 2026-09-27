@@ -9,6 +9,7 @@ from app.jobs.repository import JobRepository
 from app.leads.crawler import WebsiteCrawler
 from app.leads.parser import ParsedLead, is_generic_company_name, lead_identity, parse_leads, valid_phone
 from app.leads.repository import LeadRepository
+from app.leads.smart_data import data_completeness, repair_parsed_lead
 from app.leads.search_queries import generate_search_queries
 from app.providers.ai import GeminiExtractor, OpenAIExtractor
 from app.providers.repository import ProviderRepository
@@ -180,6 +181,60 @@ def _deterministic_leads(results: list[SearchResult], location: str | None) -> l
     return leads
 
 
+def _needs_ai(results: list[SearchResult], leads: list[ParsedLead]) -> bool:
+    if not results:
+        return False
+    if not leads:
+        return True
+    coverage = len(leads) / max(1, len(results))
+    completeness = sum(
+        data_completeness({
+            "company_name": lead.company_name,
+            "email": lead.email,
+            "website": lead.website,
+            "domain": lead.domain,
+            "phone": lead.phone,
+            "first_name": lead.first_name,
+            "job_title": lead.job_title,
+            "linkedin_url": lead.linkedin_url,
+            "region": lead.region,
+        })
+        for lead in leads
+    ) / max(1, len(leads))
+    return coverage < 0.45 or completeness < 42
+
+
+def _merge_candidate_lists(primary: list[ParsedLead], secondary: list[ParsedLead]) -> list[ParsedLead]:
+    output: list[ParsedLead] = []
+    by_identity: dict[str, int] = {}
+
+    def quality(lead: ParsedLead) -> int:
+        return data_completeness({
+            "company_name": lead.company_name,
+            "email": lead.email,
+            "website": lead.website,
+            "domain": lead.domain,
+            "phone": lead.phone,
+            "first_name": lead.first_name,
+            "job_title": lead.job_title,
+            "linkedin_url": lead.linkedin_url,
+            "region": lead.region,
+        })
+
+    for lead in [*primary, *secondary]:
+        lead = repair_parsed_lead(lead)
+        identity = lead_identity(lead)
+        if not identity:
+            continue
+        existing = by_identity.get(identity)
+        if existing is None:
+            by_identity[identity] = len(output)
+            output.append(lead)
+        elif quality(lead) > quality(output[existing]):
+            output[existing] = lead
+    return output
+
+
 def _ai_leads(extractor, results: list[SearchResult], niche: str, location: str | None, source: str) -> list[ParsedLead]:
     output: list[ParsedLead] = []
     seen: set[str] = set()
@@ -268,11 +323,9 @@ class LeadDiscoveryService:
         connected = set(credentials)
         if requested != "auto":
             return [requested] if requested in connected else []
-        if "serper" in connected:
-            return ["serper"]
-        if "brave" in connected:
-            return ["brave"]
-        return []
+        # Ordered failover. Serper is attempted first; Brave is only used when
+        # Serper is unavailable or produces no usable results.
+        return [provider for provider in ("serper", "brave") if provider in connected]
 
     @staticmethod
     def _ai_extractors(credentials: dict[str, dict], requested: str) -> list[tuple[str, object]]:
@@ -350,6 +403,8 @@ class LeadDiscoveryService:
                     progress["progress_percent"] = min(88, 5 + int((query_index / max(len(queries), 1)) * 75))
                     progress["found_count"] = found
                     self.jobs.progress(user_id, job_id, progress)
+
+                    provider_results: list[SearchResult] = []
                     try:
                         if provider == "serper":
                             client = SerperSearchClient(creds["api_key"])
@@ -358,7 +413,7 @@ class LeadDiscoveryService:
                                     break
                                 page_results = client.search(query, page=page, location=location, num=10)
                                 calls += 1
-                                normalized_results.extend(page_results)
+                                provider_results.extend(page_results)
                                 if len(page_results) < 8:
                                     break
                         elif provider == "brave":
@@ -368,35 +423,45 @@ class LeadDiscoveryService:
                                     break
                                 page_results, more = client.search(query, offset=offset, count=20)
                                 calls += 1
-                                normalized_results.extend(page_results)
+                                provider_results.extend(page_results)
                                 if not more:
                                     break
                     except Exception as exc:
                         errors.append(f"{provider}: {exc}")
+                        provider_results = []
+
+                    usable = _filter_results(provider_results, niche, location)
+                    if usable:
+                        normalized_results.extend(usable)
+                        break
 
                 normalized_results = _filter_results(normalized_results, niche, location)
                 if not normalized_results:
                     continue
 
-                parsed: list[ParsedLead] | None = None
-                for extractor_name, extractor in ai_extractors:
-                    try:
-                        parsed = _ai_leads(extractor, normalized_results, niche, location, extractor_name)
-                        ai_used = extractor_name
-                        break
-                    except ProviderCredentialsError as exc:
-                        errors.append(f"{extractor_name}: {exc}")
-                        try:
-                            self.providers.mark_error(user_id, extractor_name, str(exc))
-                        except Exception:
-                            pass
-                    except (ProviderRateLimitError, ProviderRequestError) as exc:
-                        errors.append(f"{extractor_name}: {exc}")
-                    except Exception as exc:
-                        errors.append(f"{extractor_name}: extraction failed")
+                # Zero-credit deterministic extraction runs first.
+                parsed = _deterministic_leads(normalized_results, location)
+                parsed = [repair_parsed_lead(lead, list_location=location) for lead in parsed]
 
-                if parsed is None:
-                    parsed = _deterministic_leads(normalized_results, location)
+                # AI is a fallback only for ambiguous or low-coverage batches.
+                if ai_extractors and _needs_ai(normalized_results, parsed):
+                    for extractor_name, extractor in ai_extractors:
+                        try:
+                            ai_candidates = _ai_leads(extractor, normalized_results, niche, location, extractor_name)
+                            if ai_candidates:
+                                parsed = _merge_candidate_lists(parsed, ai_candidates)
+                                ai_used = extractor_name
+                                break
+                        except ProviderCredentialsError as exc:
+                            errors.append(f"{extractor_name}: {exc}")
+                            try:
+                                self.providers.mark_error(user_id, extractor_name, str(exc))
+                            except Exception:
+                                pass
+                        except (ProviderRateLimitError, ProviderRequestError) as exc:
+                            errors.append(f"{extractor_name}: {exc}")
+                        except Exception:
+                            errors.append(f"{extractor_name}: extraction failed")
 
                 enriched: list[ParsedLead] = []
                 batch_seen: set[str] = set()

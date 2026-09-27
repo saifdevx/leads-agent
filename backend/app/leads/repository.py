@@ -5,6 +5,7 @@ from uuid import uuid4
 
 from app.db.client import TursoHttpClient
 from app.leads.parser import ParsedLead, is_generic_company_name, lead_match_keys
+from app.leads.smart_data import repair_lead_row, repair_parsed_lead
 
 
 class LeadListNotFoundError(LookupError):
@@ -149,6 +150,13 @@ class LeadRepository:
                    (SELECT COUNT(*) FROM leads l WHERE l.user_id = ll.user_id AND l.list_id = ll.id) AS lead_count
             FROM lead_lists ll
             WHERE ll.user_id = ?
+              AND (
+                  ll.status = 'searching'
+                  OR EXISTS (
+                      SELECT 1 FROM leads visible
+                      WHERE visible.user_id = ll.user_id AND visible.list_id = ll.id
+                  )
+              )
             ORDER BY ll.created_at DESC
             """,
             (user_id,),
@@ -162,6 +170,13 @@ class LeadRepository:
                    (SELECT COUNT(*) FROM leads l WHERE l.user_id = ll.user_id AND l.list_id = ll.id) AS lead_count
             FROM lead_lists ll
             WHERE ll.user_id = ?
+              AND (
+                  ll.status = 'searching'
+                  OR EXISTS (
+                      SELECT 1 FROM leads visible
+                      WHERE visible.user_id = ll.user_id AND visible.list_id = ll.id
+                  )
+              )
             ORDER BY ll.created_at DESC
         """
         if list_id:
@@ -190,7 +205,13 @@ class LeadRepository:
             (list_sql, (user_id,), True),
             (lead_sql, lead_params, True),
         ])
-        return results[0].rows, results[1].rows
+        lists = results[0].rows
+        locations = {str(item.get("id")): item.get("location") for item in lists}
+        repaired = [
+            repair_lead_row(row, list_location=locations.get(str(row.get("list_id"))))
+            for row in results[1].rows
+        ]
+        return lists, repaired
 
     def list_leads(self, user_id: str, list_id: str | None = None) -> list[dict]:
         if list_id:
@@ -220,7 +241,7 @@ class LeadRepository:
                 """,
                 (user_id,),
             )
-        return result.rows
+        return [repair_lead_row(row) for row in result.rows]
 
     def get_leads_by_ids(self, user_id: str, lead_ids: list[str]) -> list[dict]:
         clean_ids = list(dict.fromkeys(lead_id for lead_id in lead_ids if lead_id))[:500]
@@ -240,7 +261,10 @@ class LeadRepository:
             """,
             (user_id, *clean_ids),
         )
-        return result.rows
+        return [
+            repair_lead_row(row, list_location=str(row.get("list_location") or "") or None)
+            for row in result.rows
+        ]
 
     def update_enriched_lead(
         self,
@@ -326,6 +350,10 @@ class LeadRepository:
 
     def import_parsed_leads(self, user_id: str, list_id: str, leads: list[ParsedLead]) -> tuple[list[dict], int, int]:
         lead_list = self.get_lead_list(user_id, list_id)
+        leads = [
+            repair_parsed_lead(lead, list_location=lead_list.get("location"))
+            for lead in leads
+        ]
         existing_rows = self.database.execute(
             """
             SELECT id, company_name, website, domain, first_name, last_name, job_title,
