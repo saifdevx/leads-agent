@@ -5,6 +5,8 @@ import re
 from html.parser import HTMLParser
 from urllib.parse import unquote, urlparse
 
+from app.leads.company_names import clean_company_name
+
 
 TOKEN = re.compile(r"{{\s*([^{}]+?)\s*}}")
 
@@ -300,6 +302,11 @@ def infer_company_name(lead: dict) -> str | None:
 def resolve_template_values(lead: dict, sender: dict) -> dict[str, str]:
     first_name = str(lead.get("first_name") or "").strip()
     last_name = str(lead.get("last_name") or "").strip()
+    # Names imported into person columns can also contain captions/markup.
+    if len(first_name.split()) > 3 or not clean_company_name(first_name):
+        first_name = ""
+    if len(last_name.split()) > 4 or not clean_company_name(last_name):
+        last_name = ""
     contact_name = " ".join(part for part in (first_name, last_name) if part).strip()
     inferred_company = infer_company_name(lead)
     company_for_copy = inferred_company or "your company"
@@ -350,14 +357,29 @@ def uses_company_personalization(text: str) -> bool:
                for match in TOKEN.finditer(text or ""))
 
 
-def render_template(text: str, lead: dict, sender: dict) -> str:
+def render_template(text: str, lead: dict, sender: dict, *, subject: bool = False) -> str:
     values = resolve_template_values(lead, sender)
+    source = text or ""
+    is_html = bool(HTML_HINT.search(source))
+    # Exact legacy literal matching is restricted to this lead's original bad
+    # caption. Never use an AI rewrite of the approved message or its claims.
+    raw = str(lead.get("_company_name_original", lead.get("company_name")) or "").strip()
+    if len(raw) >= 8 and not clean_company_name(raw):
+        replacement = values["company_name"]
+        source = re.sub(re.escape(raw), lambda _: html.escape(replacement) if is_html else replacement, source, flags=re.I)
 
     def repl(match: re.Match[str]) -> str:
         key = _normalize_token(match.group(1))
-        return values.get(key, "") if key in ALLOWED else ""
+        value = values.get(key, "") if key in ALLOWED else ""
+        return html.escape(value, quote=True) if is_html else value
 
-    return TOKEN.sub(repl, text or "").strip()
+    rendered = TOKEN.sub(repl, source).strip()
+    if not infer_company_name(lead):
+        # Also supports older templates that spell out 'Hi {{Business Name}} team'.
+        rendered = re.sub(r"\b(?:Hi|Hello|Dear)\s+(?:<[^>]+>\s*)*your company(?:\s*</[^>]+>)*\s*(?:team)?\s*[,!]", "Hi there,", rendered, flags=re.I)
+        if subject:
+            rendered = re.sub(r"\s+(?:for|at|to)\s+your company\s*$", "", rendered, flags=re.I).strip()
+    return rendered
 
 
 class _SafeEmailHTMLParser(HTMLParser):

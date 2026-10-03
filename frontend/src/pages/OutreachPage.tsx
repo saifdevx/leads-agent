@@ -268,7 +268,7 @@ export function OutreachPage({ getToken, initialLeadIds, onClearInitialLeadIds, 
       })
       setCampaignResult(result)
       setCampaigns((current) => [result.campaign, ...current])
-      setNotice('Draft created. Review the preview before approving.'); onClearInitialLeadIds()
+      setNotice(`Draft created. Review the preview before approving. ${result.unsafe_count || 0} held for identity/content review; ${result.duplicate_count || 0} duplicate recipients skipped. ${(result.safety_warnings || []).join(' ')}`); onClearInitialLeadIds()
     } catch (next) { setError(next instanceof ApiRequestError ? next.message : 'Could not create campaign.') }
     finally { setCreatingCampaign(false) }
   }

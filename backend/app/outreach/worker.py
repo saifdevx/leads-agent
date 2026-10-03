@@ -13,6 +13,7 @@ from app.core.config import get_settings
 from app.outreach.dependencies import get_outreach_repository
 from app.outreach.gmail import GmailError, refresh_access_token, send_message as send_gmail_message
 from app.outreach.hostinger import HostingerMailError, send_message as send_hostinger_message
+from app.outreach.safety import OutreachSafetyError
 from app.outreach.sending import send_with_sender
 
 
@@ -111,6 +112,9 @@ def process_once() -> int:
                 body=message["body"],
             )
             repository.mark_sent(message["id"], provider_id)
+        except OutreachSafetyError as exc:
+            # Content/recipient problems are not broken sender credentials.
+            repository.mark_failed(message["id"], str(exc))
         except Exception as exc:
             # Fail safe. We deliberately do not automatically retry an uncertain send,
             # because a timeout after Gmail accepted the message could create duplicates.

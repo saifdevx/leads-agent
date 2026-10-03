@@ -61,7 +61,7 @@ def test_empty_results_and_missing_pagination(monkeypatch):
     ("auto", {"apollo": {}}, ["apollo"]),
     ("apollo", {"apollo": {}, "serper": {}}, ["apollo"]),
     ("auto", {"apollo": {}, "serper": {}, "brave": {}}, ["serper", "brave"]),
-    ("auto", {"openai": {}, "prospeo": {}}, []),
+    ("auto", {"openai": {}, "prospeo": {}}, ["prospeo"]),
     ("apollo", {"serper": {}}, []),
     ("openai", {"openai": {}}, []),
 ])
@@ -72,7 +72,7 @@ def test_discovery_source_selection_and_no_unexpected_apollo_spend(requested, cr
 def test_request_schema_accepts_apollo_and_rejects_non_search_provider():
     assert AutomatedLeadSearchRequest(niche="roofing", search_provider="apollo").search_provider == "apollo"
     with pytest.raises(ValueError):
-        AutomatedLeadSearchRequest(niche="roofing", search_provider="prospeo")
+        AutomatedLeadSearchRequest(niche="roofing", search_provider="openai")
 
 
 class Leads:

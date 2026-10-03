@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
+from app.leads.identity import identity_issue
+from app.providers.catalog import ENRICHMENT_PROVIDERS
 from app.jobs.repository import JobRepository
 from app.leads.repository import LeadRepository
 from app.providers.enrichment import (
@@ -11,7 +13,7 @@ from app.providers.enrichment import (
     ProspeoClient,
 )
 from app.providers.repository import ProviderRepository
-from app.providers.search import ProviderRequestError
+from app.providers.search import ProviderRequestError, ProviderCredentialsError, ProviderRateLimitError
 
 
 class LeadEnrichmentService:
@@ -57,7 +59,7 @@ class LeadEnrichmentService:
 
     @staticmethod
     def _should_skip(lead: dict) -> bool:
-        return bool(lead.get("email") and str(lead.get("email_status") or "").lower() == "verified" and lead.get("first_name"))
+        return bool(identity_issue(lead) or lead.get("outreach_block_reason")) or bool(lead.get("email") and str(lead.get("email_status") or "").lower() == "verified" and lead.get("first_name"))
 
     def _prospeo_contact(self, client: ProspeoClient, lead: dict, titles: list[str]) -> EnrichedContact | None:
         domain = self._domain(lead)
@@ -121,7 +123,7 @@ class LeadEnrichmentService:
     ) -> None:
         titles = [title.strip() for title in (target_titles or list(DEFAULT_TARGET_TITLES)) if title.strip()][:20]
         credentials = self.providers.connected_credentials(user_id)
-        available = [name for name in ("prospeo", "apollo") if name in credentials]
+        available = [name for name in ENRICHMENT_PROVIDERS if name in credentials]
         if provider != "auto":
             available = [provider] if provider in available else []
         if not available:
@@ -148,6 +150,7 @@ class LeadEnrichmentService:
         if "apollo" in available:
             clients["apollo"] = ApolloClient(credentials["apollo"]["api_key"])
 
+        disabled: set[str] = set()
         total = max(len(leads), 1)
         for index, lead in enumerate(leads, start=1):
             result["processed_count"] = index - 1
@@ -164,11 +167,17 @@ class LeadEnrichmentService:
             enriched: EnrichedContact | None = None
             used_provider: str | None = None
             for name in available:
+                if name in disabled:
+                    continue
                 try:
                     if name == "prospeo":
                         enriched = self._prospeo_contact(clients[name], lead, titles)  # type: ignore[arg-type]
-                    else:
+                    elif name == "apollo":
                         enriched = self._apollo_contact(clients[name], lead, titles)  # type: ignore[arg-type]
+                except (ProviderCredentialsError, ProviderRateLimitError) as exc:
+                    disabled.add(name)
+                    result["errors"].append(f"{name}: {exc}")
+                    continue
                 except ProviderRequestError as exc:
                     result["errors"].append(f"{name}: {exc}")
                     continue

@@ -96,6 +96,9 @@ class CampaignCreateResponse(BaseModel):
     preview: list[CampaignPreviewItem]
     suppressed_count: int = 0
     missing_email_count: int = 0
+    unsafe_count: int = 0
+    duplicate_count: int = 0
+    safety_warnings: list[str] = Field(default_factory=list)
 
 
 class CampaignStepResponse(BaseModel):

@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { providersFor } from '../lib/searchProviders'
 import { Icon } from '../components/Icon'
 import {
   ApiRequestError,
   deleteLeads,
   downloadLeadExport,
   getJob,
+  getProviders,
+  type ProviderConnection,
   getLeadDatabaseSnapshot,
   importLeadFile,
   startLeadEnrichment,
@@ -15,7 +18,7 @@ import {
 type Props = { getToken: () => Promise<string>; onStartOutreach?: (leadIds: string[]) => void }
 type EmailFilter = 'all' | 'verified' | 'has_email' | 'missing_email'
 type ExportFormat = 'xlsx' | 'csv'
-type EnrichmentProvider = 'auto' | 'prospeo' | 'apollo'
+type EnrichmentProvider = string
 
 const DEFAULT_TITLES = 'Owner, Founder, CEO, President, Managing Director'
 
@@ -45,6 +48,15 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
   const [exportFormat, setExportFormat] = useState<ExportFormat>('xlsx')
   const [exporting, setExporting] = useState(false)
   const [enrichOpen, setEnrichOpen] = useState(false)
+  const [enrichmentProviders, setEnrichmentProviders] = useState<ProviderConnection[]>([])
+  useEffect(() => {
+    if (!enrichOpen) return
+    let active = true
+    getToken().then((token) => getProviders(token, true)).then((items) => {
+      if (active) setEnrichmentProviders(providersFor(items, "enrichment"))
+    }).catch(() => { if (active) setError("Could not refresh enrichment providers. Check Settings before starting.") })
+    return () => { active = false }
+  }, [enrichOpen, getToken])
   const [enriching, setEnriching] = useState(false)
   const [enrichProvider, setEnrichProvider] = useState<EnrichmentProvider>('auto')
   const [targetTitles, setTargetTitles] = useState(DEFAULT_TITLES)
@@ -384,7 +396,9 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
                     <tr key={lead.id} className="motion-row bg-white text-sm hover:bg-[#FCFCFD]">
                       <td className="px-5 py-4"><input aria-label={`Select ${lead.company_name || lead.domain || 'lead'}`} type="checkbox" checked={selectedIds.has(lead.id)} onChange={() => toggleLead(lead.id)} /></td>
                       <td className="px-3 py-4">
-                        <div className="font-semibold text-[#2D3038]">{lead.company_name || lead.domain || 'Unknown business'}</div>
+                        <div className="font-semibold text-[#2D3038]">{lead.outreach_block_reason ? 'Review required' : lead.company_name || 'Name unavailable'}</div>
+                        {lead.outreach_block_reason && <div className="mt-1 max-w-[300px] text-xs text-[#9D3D36]">{lead.outreach_block_reason}</div>}
+                        {lead.company_name_status === 'inferred' && <div className="mt-1 text-[10px] text-[#777A87]">Name inferred from available evidence — review before sending</div>}
                         <div className="mt-1 text-xs text-[#898C96]">{[lead.city, lead.region, lead.country].filter(Boolean).join(', ') || lead.domain || '—'}</div>
                       </td>
                       <td className="px-4 py-4">
@@ -437,9 +451,8 @@ export function MyLeadsPage({ getToken, onStartOutreach }: Props) {
             <label className="mt-6 block">
               <span className="mb-2 block text-[13px] font-semibold text-[#343741]">Provider</span>
               <select value={enrichProvider} onChange={(event) => setEnrichProvider(event.target.value as EnrichmentProvider)} className="focus-ring h-12 w-full rounded-[10px] border border-[#DCDDE5] bg-white px-4 text-sm">
-                <option value="auto">Smart — Prospeo then Apollo</option>
-                <option value="prospeo">Prospeo only</option>
-                <option value="apollo">Apollo only</option>
+                <option value="auto">Automatic — connected enrichment providers</option>
+                {enrichmentProviders.map((provider) => <option key={provider.provider} value={provider.provider} disabled={!provider.connected}>{provider.label}{provider.connected ? "" : " — connect in Settings"}</option>)}
               </select>
             </label>
 

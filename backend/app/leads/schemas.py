@@ -1,4 +1,6 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from app.providers.catalog import AI_PROVIDERS, DISCOVERY_PROVIDERS, ENRICHMENT_PROVIDERS
 
 
 class LeadSearchRequest(BaseModel):
@@ -33,6 +35,8 @@ class LeadResponse(BaseModel):
     id: str
     list_id: str
     company_name: str | None = None
+    company_name_status: str | None = None
+    outreach_block_reason: str | None = None
     website: str | None = None
     domain: str | None = None
     first_name: str | None = None
@@ -78,9 +82,23 @@ class AutomatedLeadSearchRequest(BaseModel):
     niche: str = Field(min_length=2, max_length=120)
     location: str | None = Field(default=None, max_length=120)
     target_count: int = Field(default=100, ge=1, le=500)
-    search_provider: str = Field(default="auto", pattern="^(auto|serper|brave|apollo)$")
-    ai_provider: str = Field(default="auto", pattern="^(auto|none|gemini|openai)$")
+    search_provider: str = Field(default="auto", max_length=60)
+    ai_provider: str = Field(default="auto", max_length=60)
     crawl_websites: bool = True
+
+    @field_validator("search_provider")
+    @classmethod
+    def supported_search(cls, value: str) -> str:
+        if value != "auto" and value not in DISCOVERY_PROVIDERS:
+            raise ValueError("Choose a supported lead-search provider.")
+        return value
+
+    @field_validator("ai_provider")
+    @classmethod
+    def supported_ai(cls, value: str) -> str:
+        if value not in {"auto", "none", *AI_PROVIDERS}:
+            raise ValueError("Choose a supported AI provider.")
+        return value
 
 
 class AutomatedLeadSearchResponse(BaseModel):
@@ -91,7 +109,15 @@ class AutomatedLeadSearchResponse(BaseModel):
 
 class LeadEnrichmentRequest(BaseModel):
     lead_ids: list[str] = Field(min_length=1, max_length=500)
-    provider: str = Field(default="auto", pattern="^(auto|prospeo|apollo)$")
+    provider: str = Field(default="auto", max_length=60)
+
+    @field_validator("provider")
+    @classmethod
+    def supported_enrichment(cls, value: str) -> str:
+        if value != "auto" and value not in ENRICHMENT_PROVIDERS:
+            raise ValueError("Choose a supported contact-enrichment provider.")
+        return value
+
     target_titles: list[str] = Field(
         default_factory=lambda: ["Owner", "Founder", "CEO", "President", "Managing Director"],
         max_length=20,

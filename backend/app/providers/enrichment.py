@@ -83,6 +83,8 @@ class ProspeoClient:
         except ValueError:
             payload = {}
 
+        if not isinstance(payload, dict):
+            raise ProviderRequestError("Prospeo returned an unexpected response.")
         error_code = str(payload.get("error_code") or "").upper()
         if response.status_code in (401, 403) or error_code == "INVALID_API_KEY":
             raise ProviderCredentialsError("Prospeo rejected the API key.")
@@ -90,11 +92,12 @@ class ProspeoClient:
             raise ProviderRateLimitError("Prospeo rate limit reached.")
         if error_code == "INSUFFICIENT_CREDITS":
             raise ProviderRateLimitError("Prospeo credits are exhausted.")
-        if not response.is_success:
+        if not response.is_success or payload.get("error"):
             if error_code in {"NO_MATCH", "NO_RESULTS"}:
                 return {"error": True, "error_code": error_code}
-            detail = payload.get("filter_error") or payload.get("message") or error_code
-            raise ProviderRequestError(f"Prospeo request failed{': ' + str(detail) if detail else '.'}")
+            if error_code == "PLAN_REQUIRED":
+                raise ProviderRequestError("Prospeo account does not permit these search filters. Check API plan access in Prospeo.")
+            raise ProviderRequestError(f"Prospeo request failed ({error_code if error_code in {'INVALID_FILTERS', 'INVALID_REQUEST', 'SERVICE_TEMPORARILY_UNAVAILABLE', 'INTERNAL_ERROR'} else response.status_code}).")
         return payload
 
     def validate(self) -> dict[str, Any]:
@@ -232,13 +235,16 @@ class ApolloClient:
         if response.status_code == 401:
             raise ProviderCredentialsError("Apollo rejected the API key.")
         if response.status_code == 403:
-            raise ProviderCredentialsError("Apollo key or plan does not allow this API endpoint.")
+            raise ProviderCredentialsError("Apollo denied this endpoint. For company search, enable api/v1/mixed_companies/search on your key and confirm your account is eligible (including its work-email requirement). Saving a key checks authentication, not search access. Enrichment may still work.")
         if response.status_code == 429:
             raise ProviderRateLimitError("Apollo rate limit or credit limit reached.")
         if not response.is_success:
             raise ProviderRequestError(f"Apollo returned HTTP {response.status_code}.")
         try:
-            return response.json()
+            payload = response.json()
+            if not isinstance(payload, dict):
+                raise ProviderRequestError("Apollo returned an unexpected response.")
+            return payload
         except ValueError as exc:
             raise ProviderRequestError("Apollo returned an invalid response.") from exc
 

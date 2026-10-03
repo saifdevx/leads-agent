@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { supports } from '../lib/searchProviders'
 import { Icon } from '../components/Icon'
 import { ApiRequestError, connectProvider, disconnectProvider, getProviders, type ProviderConnection } from '../lib/api'
 
@@ -6,7 +7,7 @@ type Props = { getToken: () => Promise<string> }
 
 type Draft = { provider: ProviderConnection; apiKey: string; model: string }
 
-const providerOrder = ['serper', 'brave', 'gemini', 'openai', 'prospeo', 'apollo']
+
 
 export function SettingsPage({ getToken }: Props) {
   const [providers, setProviders] = useState<ProviderConnection[]>([])
@@ -20,7 +21,7 @@ export function SettingsPage({ getToken }: Props) {
     setError(null)
     try {
       const token = await getToken()
-      setProviders(await getProviders(token))
+      setProviders(await getProviders(token, true))
     } catch (nextError) {
       setError(nextError instanceof ApiRequestError ? nextError.message : 'Could not load integrations.')
     } finally {
@@ -30,7 +31,7 @@ export function SettingsPage({ getToken }: Props) {
 
   useEffect(() => { void load() }, [])
 
-  const ordered = useMemo(() => [...providers].sort((a, b) => providerOrder.indexOf(a.provider) - providerOrder.indexOf(b.provider)), [providers])
+  const ordered = useMemo(() => [...providers].sort((a, b) => (a.priority ?? 100) - (b.priority ?? 100) || a.label.localeCompare(b.label)), [providers])
 
   async function saveDraft() {
     if (!draft || !draft.apiKey.trim()) return
@@ -90,10 +91,12 @@ export function SettingsPage({ getToken }: Props) {
                   <div className="flex items-center gap-2">
                     <h3 className="font-display text-lg font-bold text-[#24262D]">{provider.label}</h3>
                     <span className={`rounded-md px-2 py-1 text-[10px] font-extrabold uppercase tracking-[0.06em] ${provider.connected ? 'bg-[#F0F8DC] text-[#688328]' : 'bg-[#F2F1F6] text-[#777A87]'}`}>
-                      {provider.connected ? 'Connected' : provider.category === 'ai' ? 'Optional AI' : provider.category === 'enrichment' ? 'Enrichment' : 'Search'}
+                      {provider.connected ? 'Key connected' : (provider.capabilities || [provider.category]).join(' + ')}
                     </span>
                   </div>
                   <p className="mt-2 max-w-[520px] text-sm leading-6 text-[#6F727E]">{provider.description}</p>
+                  <p className="mt-1 text-xs font-semibold text-[#6D52EE]">Capabilities: {(provider.capabilities || [provider.category]).join(" + ")}</p>
+                  <p className="mt-2 text-xs leading-5 text-[#777A87]">{provider.usage_note}</p>
                 </div>
               </div>
 
@@ -102,7 +105,7 @@ export function SettingsPage({ getToken }: Props) {
                   {provider.connected ? (
                     <span>{provider.key_hint}{provider.model ? ` · ${provider.model}` : ''}</span>
                   ) : (
-                    <span>{provider.provider === 'serper' ? 'Best match for Google-style prospecting.' : provider.provider === 'brave' ? 'Useful secondary web coverage.' : provider.provider === 'prospeo' ? 'Verified-email enrichment. Credits are only used when you choose to enrich.' : provider.provider === 'apollo' ? 'Decision-maker discovery and contact enrichment. Credits depend on your Apollo plan.' : 'Improves cleanup and relevance filtering.'}</span>
+                    <span>Connect a key to enable the capabilities shown above.</span>
                   )}
                 </div>
                 <div className="flex gap-2">
@@ -140,7 +143,7 @@ export function SettingsPage({ getToken }: Props) {
               <input type="password" autoComplete="off" value={draft.apiKey} onChange={(event) => setDraft((current) => current ? { ...current, apiKey: event.target.value } : current)} placeholder="Paste your API key" className="focus-ring h-12 w-full rounded-[10px] border border-[#DCDDE5] px-4 text-sm" />
             </label>
 
-            {draft.provider.category === 'ai' && (
+            {supports(draft.provider, 'ai') && (
               <label className="mt-4 block">
                 <span className="mb-2 block text-[13px] font-semibold text-[#343741]">Model</span>
                 <input value={draft.model} onChange={(event) => setDraft((current) => current ? { ...current, model: event.target.value } : current)} className="focus-ring h-12 w-full rounded-[10px] border border-[#DCDDE5] px-4 text-sm" />
@@ -148,7 +151,7 @@ export function SettingsPage({ getToken }: Props) {
               </label>
             )}
 
-            <div className="mt-6 rounded-[10px] bg-[#F8F7FC] px-4 py-3 text-xs leading-5 text-[#6E717D]">The backend validates this key before saving it. AI connections run one tiny generation test so unusable project/model access is caught immediately. The plaintext key is not returned after storage.</div>
+            <div className="mt-6 rounded-[10px] bg-[#F8F7FC] px-4 py-3 text-xs leading-5 text-[#6E717D]">{draft.provider.usage_note} The key is encrypted after validation. Key validation does not guarantee access to every endpoint or available credits.</div>
 
             <div className="mt-6 flex justify-end gap-2">
               <button type="button" disabled={saving} onClick={() => setDraft(null)} className="focus-ring h-10 rounded-[9px] border border-[#DDDDE4] px-4 text-sm font-bold text-[#62656F]">Cancel</button>

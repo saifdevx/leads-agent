@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../components/Icon'
-import { connectedSearchProviders, SEARCH_SOURCES, searchReady, usesApolloSearch, type SearchProvider } from '../lib/searchProviders'
+import { connectedSearchProviders, providersFor, searchSources, searchReady, selectedSearchProviders, type SearchProvider } from '../lib/searchProviders'
 import {
   ApiRequestError,
   createSearchPlan,
@@ -31,7 +31,7 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
   const [mode, setMode] = useState<Mode>('automatic')
   const [advanced, setAdvanced] = useState(false)
   const [searchProvider, setSearchProvider] = useState<SearchProvider>('auto')
-  const [aiProvider, setAiProvider] = useState<'auto' | 'none' | 'gemini' | 'openai'>('auto')
+  const [aiProvider, setAiProvider] = useState<string>('auto')
   const [crawlWebsites, setCrawlWebsites] = useState(true)
   const [autoEnrich, setAutoEnrich] = useState(false)
   const [providers, setProviders] = useState<ProviderConnection[]>([])
@@ -42,6 +42,7 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
   const pollTimer = useRef<number | null>(null)
   const enrichmentPollTimer = useRef<number | null>(null)
   const autoEnrichStarted = useRef(false)
+  const runEnrichment = useRef(false)
 
   const [plan, setPlan] = useState<SearchPlan | null>(null)
   const [selectedQuery, setSelectedQuery] = useState('')
@@ -75,13 +76,13 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
   }, [refreshProviders])
 
   async function maybeStartAutoEnrichment(token: string, listId: string | undefined) {
-    if (!autoEnrich || !listId || autoEnrichStarted.current) return false
-    const enrichmentConnected = providers.some((item) => item.category === 'enrichment' && item.connected)
+    if (!runEnrichment.current || !listId || autoEnrichStarted.current) return false
+    const enrichmentConnected = providersFor(providers, 'enrichment').some((item) => item.connected)
     if (!enrichmentConnected) return false
     autoEnrichStarted.current = true
     const listLeads = await getLeads(token, listId)
     const leadIds = listLeads
-      .filter((lead) => !(lead.email && (lead.email_status || '').toLowerCase() === 'verified' && lead.first_name))
+      .filter((lead) => !lead.outreach_block_reason && !(lead.email && (lead.email_status || '').toLowerCase() === 'verified' && lead.first_name))
       .map((lead) => lead.id)
       .slice(0, 500)
     if (!leadIds.length) return false
@@ -175,12 +176,15 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
   }, [enrichmentJobId, getToken])
 
   const connectedSearch = useMemo(() => connectedSearchProviders(providers), [providers])
-  const connectedAi = useMemo(() => providers.filter((item) => item.category === 'ai' && item.connected), [providers])
-  const connectedEnrichment = useMemo(() => providers.filter((item) => item.category === 'enrichment' && item.connected), [providers])
+  const connectedAi = useMemo(() => providersFor(providers, 'ai').filter((item) => item.connected), [providers])
+  const connectedEnrichment = useMemo(() => providersFor(providers, 'enrichment').filter((item) => item.connected), [providers])
   const automaticReady = !providersLoading && !providerError && searchReady(providers, searchProvider)
-  const apolloSearch = usesApolloSearch(providers, searchProvider)
+  const activeSources = selectedSearchProviders(providers, searchProvider)
 
   async function startSearch() {
+    if (busy || !automaticReady) return
+    runEnrichment.current = autoEnrich && connectedEnrichment.length > 0
+    setJobId(null)
     setBusy('search')
     setError(null)
     setPollWarning(null)
@@ -287,7 +291,7 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
               <span className="mb-2 block text-xs font-bold text-[#51545F]">Search source</span>
               <select value={searchProvider} disabled={Boolean(busy) || providersLoading} onChange={(event) => setSearchProvider(event.target.value as typeof searchProvider)} className="focus-ring h-10 w-full rounded-[8px] border border-[#DCDDE5] bg-white px-3 text-sm">
                 <option value="auto">Smart / automatic</option>
-                {SEARCH_SOURCES.map((source) => {
+                {searchSources(providers).map((source) => {
                   const connected = connectedSearch.some((item) => item.provider === source.id)
                   return <option key={source.id} value={source.id} disabled={!connected}>{source.label}{connected ? ' — connected' : ' — connect in Settings'}</option>
                 })}
@@ -295,27 +299,30 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
             </label>
             <label>
               <span className="mb-2 block text-xs font-bold text-[#51545F]">AI cleanup</span>
-              <select value={aiProvider} onChange={(event) => setAiProvider(event.target.value as typeof aiProvider)} className="focus-ring h-10 w-full rounded-[8px] border border-[#DCDDE5] bg-white px-3 text-sm">
+              <select value={aiProvider} disabled={Boolean(busy)} onChange={(event) => setAiProvider(event.target.value as typeof aiProvider)} className="focus-ring h-10 w-full rounded-[8px] border border-[#DCDDE5] bg-white px-3 text-sm">
                 <option value="auto">Automatic</option>
                 <option value="none">Off</option>
-                <option value="gemini">Gemini</option>
-                <option value="openai">OpenAI</option>
+                {providersFor(providers, 'ai').map((provider) => <option key={provider.provider} value={provider.provider} disabled={!provider.connected}>{provider.label}{provider.connected ? '' : ' — connect in Settings'}</option>)}
               </select>
             </label>
             <label className="flex items-end gap-3 pb-2">
-              <input type="checkbox" checked={crawlWebsites} onChange={(event) => setCrawlWebsites(event.target.checked)} className="h-4 w-4 accent-[#7B61FF]" />
+              <input type="checkbox" checked={crawlWebsites} disabled={Boolean(busy)} onChange={(event) => setCrawlWebsites(event.target.checked)} className="h-4 w-4 accent-[#7B61FF]" />
               <span className="text-sm font-semibold text-[#51545F]">Check company websites</span>
             </label>
             <label className={`flex items-end gap-3 pb-2 ${connectedEnrichment.length ? '' : 'opacity-55'}`}>
-              <input type="checkbox" disabled={!connectedEnrichment.length} checked={autoEnrich && connectedEnrichment.length > 0} onChange={(event) => setAutoEnrich(event.target.checked)} className="h-4 w-4 accent-[#7B61FF]" />
-              <span className="text-sm font-semibold text-[#51545F]">Auto-enrich contacts <span className="block text-[10px] font-medium text-[#8A8D97]">Uses Prospeo/Apollo credits</span></span>
+              <input type="checkbox" disabled={!connectedEnrichment.length || Boolean(busy)} checked={autoEnrich && connectedEnrichment.length > 0} onChange={(event) => setAutoEnrich(event.target.checked)} className="h-4 w-4 accent-[#7B61FF]" />
+              <span className="text-sm font-semibold text-[#51545F]">Auto-enrich contacts <span className="block text-[10px] font-medium text-[#8A8D97]">Uses separate contact credits</span></span>
             </label>
           </div>
         )}
 
         {providersLoading && <p className="mt-4 text-sm text-[#777A87]">Checking connected providers…</p>}
         {providerError && <div role="alert" className="mt-4 text-sm text-[#9D3D36]">{providerError} <button type="button" onClick={() => void refreshProviders()} className="underline">Retry</button></div>}
-        {apolloSearch && mode === 'automatic' && <p className="mt-4 rounded-[10px] bg-[#F8F6FF] p-3 text-xs leading-5 text-[#706A91]">Apollo company search uses your saved key and may consume Apollo search credits. Location filters match company headquarters. Contact/email enrichment is separate and runs only when selected; company results may have no email. API endpoint access depends on your Apollo key and account.</p>}
+        {mode === 'automatic' && activeSources.length > 0 && <div className="mt-4 rounded-[10px] bg-[#F8F6FF] p-3 text-xs leading-5 text-[#706A91]">
+          {searchProvider === 'auto' && <p>Automatic uses connected web-search sources first. With no web-search key, it tries connected company databases in the order shown. A failed source is skipped for this job; credits may be used by the next source.</p>}
+          {activeSources.map((provider) => <p key={provider.provider} className="mt-1"><strong>{provider.label}:</strong> {provider.usage_note || 'Your provider quota applies.'}</p>)}
+          {activeSources.some((provider) => provider.discovery_kind === 'companies') && <p className="mt-1">Company locations mean headquarters. Company search does not reveal contact emails; enrichment is a separate, optional operation.</p>}
+        </div>}
 
         {error && <div role="alert" className="mt-5 rounded-[10px] border border-[#F0CBC8] bg-[#FFF6F5] px-4 py-3 text-sm font-medium text-[#9D3D36]">{error}</div>}
 
@@ -323,7 +330,7 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
           <div className="mt-6 rounded-[12px] border border-[#E2DDF8] bg-[#F8F6FF] p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
             <div>
               <div className="text-sm font-bold text-[#43358B]">{connectedSearch.length ? 'Choose a connected search source' : 'Connect a search provider first'}</div>
-              <p className="mt-1 text-xs leading-5 text-[#706A91]">Connect Serper or Brave for web search, or Apollo for company discovery. Apollo also remains available for contact enrichment.</p>
+              <p className="mt-1 text-xs leading-5 text-[#706A91]">Connect a provider with Search capability in Settings. AI cleanup and contact enrichment appear in their own controls; they are not interchangeable with lead discovery.</p>
             </div>
             <button type="button" onClick={onOpenSettings} className="focus-ring mt-3 h-9 rounded-[8px] bg-[#7B61FF] px-3.5 text-xs font-bold text-white sm:mt-0">Open Settings</button>
           </div>
@@ -361,11 +368,11 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
           </div>
         )}
 
-        {!job && mode === 'automatic' && (
+        {(!job || job.status === 'complete' || job.status === 'failed') && mode === 'automatic' && (
           <div className="mt-7 flex flex-col-reverse gap-3 border-t border-[#ECECF1] pt-6 sm:flex-row sm:items-center sm:justify-between">
             <button type="button" onClick={() => setMode('manual')} className="focus-ring text-left text-xs font-bold text-[#777A87] hover:text-[#5E46CF]">Use manual fallback instead</button>
             <button type="button" disabled={!automaticReady || Boolean(busy) || niche.trim().length < 2} onClick={() => void startSearch()} className="focus-ring inline-flex h-11 items-center justify-center gap-2 rounded-[10px] bg-[#7B61FF] px-5 text-sm font-bold text-white shadow-sm hover:bg-[#6C52EE] disabled:cursor-not-allowed disabled:opacity-50">
-              <Icon name="search" className="h-4 w-4" /> {busy === 'search' ? 'Starting…' : 'Find Leads'}
+              <Icon name="search" className="h-4 w-4" /> {busy === 'search' ? 'Starting…' : job ? 'Start a new search' : 'Find Leads'}
             </button>
           </div>
         )}

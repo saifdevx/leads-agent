@@ -5,9 +5,7 @@ Apollo search credits. It does NOT reveal emails or call /people/match.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
-from urllib.parse import urlparse
 
 from app.leads.parser import ParsedLead, valid_phone
 from app.leads.smart_data import infer_domain, repair_parsed_lead
@@ -15,30 +13,8 @@ from app.providers.enrichment import ApolloClient
 from app.providers.search import ProviderRequestError
 
 
-@dataclass(frozen=True)
-class ApolloSearchPage:
-    leads: list[ParsedLead]
-    has_more: bool
-
-
-def _url(value: object) -> str | None:
-    text = str(value or "").strip()
-    if not text:
-        return None
-    try:
-        parsed = urlparse(text if "://" in text else f"https://{text}")
-        if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
-            return None
-        return parsed.geturl()
-    except ValueError:
-        return None
-
-
-def _integer(value: object) -> int | None:
-    try:
-        return int(value)  # type: ignore[arg-type]
-    except (ValueError, TypeError, OverflowError):
-        return None
+# Preserve the earlier public name for backwards-compatible tests/imports.
+from app.providers.company_search import CompanySearchPage as ApolloSearchPage, company_url as _url, integer_value as _integer
 
 
 class ApolloCompanySearchClient(ApolloClient):

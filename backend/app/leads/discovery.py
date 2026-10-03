@@ -6,6 +6,7 @@ from dataclasses import asdict, replace
 from urllib.parse import urlparse
 
 from app.jobs.repository import JobRepository
+from app.leads.identity import directory_evidence, identity_issue
 from app.leads.company_names import clean_company_name, is_suspicious_company_name, name_is_grounded
 from app.leads.crawler import WebsiteCrawler
 from app.leads.parser import ParsedLead, is_generic_company_name, lead_identity, parse_leads, valid_phone
@@ -13,7 +14,9 @@ from app.leads.repository import LeadRepository
 from app.leads.smart_data import data_completeness, infer_company_name, repair_parsed_lead
 from app.leads.search_queries import generate_search_queries
 from app.providers.apollo_search import ApolloCompanySearchClient
-from app.providers.catalog import DISCOVERY_PROVIDERS
+from app.providers.catalog import DISCOVERY_PROVIDERS, SEARCH_PROVIDERS, COMPANY_SEARCH_PROVIDERS
+from app.providers.prospeo_search import ProspeoCompanySearchClient
+from app.providers.web_search import ExaSearchClient, TavilySearchClient
 from app.providers.ai import GeminiExtractor, OpenAIExtractor
 from app.providers.repository import ProviderRepository
 from app.providers.search import (
@@ -25,6 +28,9 @@ from app.providers.search import (
     SerperSearchClient,
 )
 
+
+COMPANY_SEARCH_ADAPTERS = {"prospeo": ProspeoCompanySearchClient, "apollo": ApolloCompanySearchClient}
+WEB_SEARCH_ADAPTERS = {"serper": SerperSearchClient, "brave": BraveSearchClient, "tavily": TavilySearchClient, "exa": ExaSearchClient}
 
 SOCIAL_DOMAINS = {"instagram.com", "linkedin.com", "facebook.com", "x.com", "twitter.com"}
 LOW_QUALITY_HOSTS = {
@@ -147,6 +153,8 @@ def _niche_matches(result: SearchResult, niche: str) -> bool:
 
 def _low_quality_result(result: SearchResult) -> bool:
     host = _domain(result.url) or ""
+    if directory_evidence({"title": result.title, "source_url": result.url}):
+        return True
     if host in SOCIAL_DOMAINS:
         return False
     if any(host == blocked or host.endswith("." + blocked) for blocked in LOW_QUALITY_HOSTS):
@@ -357,12 +365,10 @@ class LeadDiscoveryService:
         connected = set(credentials)
         if requested != "auto":
             return [requested] if requested in connected and requested in DISCOVERY_PROVIDERS else []
-        # Ordered failover. Serper is attempted first; Brave is only used when
-        # Serper is unavailable or produces no usable results.
-        web_providers = [provider for provider in ("serper", "brave") if provider in connected]
-        # Preserve existing web-search cost behavior. Use Apollo automatically
-        # when it is the only discovery source; otherwise it is explicit opt-in.
-        return web_providers or (["apollo"] if "apollo" in connected else [])
+        # Web-first preserves the existing cost policy. Company databases are
+        # used automatically only when no web-search keys are connected.
+        web_providers = [provider for provider in SEARCH_PROVIDERS if provider in connected]
+        return web_providers or [provider for provider in COMPANY_SEARCH_PROVIDERS if provider in connected]
 
     @staticmethod
     def _ai_extractors(credentials: dict[str, dict], requested: str) -> list[tuple[str, object]]:
@@ -394,15 +400,15 @@ class LeadDiscoveryService:
         credentials = self.providers.connected_credentials(user_id)
         providers = self._search_providers(credentials, search_provider)
         if not providers:
-            self.jobs.fail(user_id, job_id, "Connect Serper, Brave Search, or Apollo in Settings first.")
+            self.jobs.fail(user_id, job_id, "Connect a lead-search source in Settings first.")
             self.leads.set_lead_list_status(user_id, list_id, "failed")
             return
 
-        if providers == ["apollo"]:
-            self._run_apollo(
+        if all(provider in COMPANY_SEARCH_PROVIDERS for provider in providers):
+            self._run_company_search(
                 user_id=user_id, job_id=job_id, list_id=list_id, niche=niche,
                 location=location, target_count=target_count,
-                credentials=credentials["apollo"], crawl_websites=crawl_websites,
+                credentials=credentials, provider_names=providers, crawl_websites=crawl_websites,
             )
             return
 
@@ -413,6 +419,8 @@ class LeadDiscoveryService:
         max_crawls = min(50, max(12, math.ceil(target_count / 2))) if crawl_websites else 0
         crawled = 0
         calls = 0
+        successful_calls = 0
+        disabled_providers: set[str] = set()
         found = self.leads.count_leads(user_id, list_id)
         errors: list[str] = []
         ai_used: str | None = None
@@ -438,7 +446,7 @@ class LeadDiscoveryService:
                     break
                 normalized_results: list[SearchResult] = []
                 for provider in providers:
-                    if found >= target_count or calls >= total_search_calls:
+                    if found >= target_count or calls >= total_search_calls or provider in disabled_providers:
                         continue
                     creds = credentials.get(provider)
                     if not creds:
@@ -456,8 +464,9 @@ class LeadDiscoveryService:
                             for page in range(1, 3):
                                 if calls >= total_search_calls or found >= target_count:
                                     break
-                                page_results = client.search(query, page=page, location=location, num=10)
                                 calls += 1
+                                page_results = client.search(query, page=page, location=location, num=10)
+                                successful_calls += 1
                                 provider_results.extend(page_results)
                                 if len(page_results) < 8:
                                     break
@@ -466,14 +475,34 @@ class LeadDiscoveryService:
                             for offset in range(0, 2):
                                 if calls >= total_search_calls or found >= target_count:
                                     break
-                                page_results, more = client.search(query, offset=offset, count=20)
                                 calls += 1
+                                page_results, more = client.search(query, offset=offset, count=20)
+                                successful_calls += 1
                                 provider_results.extend(page_results)
                                 if not more:
                                     break
+                        elif provider in {"tavily", "exa"}:
+                            # These APIs have no offset/page contract. Use bounded,
+                            # distinct natural-language queries, not Google operators.
+                            variations = ("official company website contact", "local businesses email phone", "commercial services contact", "residential services contact", "independent contractors website")
+                            if query_index >= len(variations):
+                                continue
+                            natural_query = f"{niche} {location or ''} {variations[query_index]}".strip()
+                            client = (TavilySearchClient if provider == "tavily" else ExaSearchClient)(creds["api_key"])
+                            calls += 1
+                            provider_results = client.search(natural_query, num=10)
+                            successful_calls += 1
+                        else:
+                            raise ProviderRequestError("No web-search adapter is implemented for this provider.")
                     except Exception as exc:
-                        errors.append(f"{provider}: {exc}")
-                        provider_results = []
+                        detail = str(exc) if isinstance(exc, ProviderRequestError) else "Search request failed. Please retry."
+                        errors.append(f"{provider}: {detail}")
+                        # No repeated charge/denial loop within a job. Auto can
+                        # try another connected source; explicit selection cannot.
+                        disabled_providers.add(provider)
+                    progress["search_calls"] = calls
+                    progress["errors"] = errors[-5:]
+                    self.jobs.progress(user_id, job_id, progress)
 
                     usable = _filter_results(provider_results, niche, location)
                     if usable:
@@ -513,6 +542,8 @@ class LeadDiscoveryService:
                     if crawl_websites and lead.website and crawled < max_crawls and (not lead.email or is_suspicious_company_name(lead.company_name)):
                         lead = _merge_crawl(lead, self.crawler)
                         crawled += 1
+                    if identity_issue(asdict(lead)):
+                        continue
                     lead = repair_parsed_lead(lead, list_location=location)
                     if not (lead.email or lead.phone or lead.website):
                         continue
@@ -540,6 +571,8 @@ class LeadDiscoveryService:
                 })
                 self.jobs.progress(user_id, job_id, progress)
 
+            if not successful_calls and errors:
+                raise ProviderRequestError("No search source completed successfully. " + errors[-1])
             final_count = self.leads.count_leads(user_id, list_id)
             self.leads.set_lead_list_status(user_id, list_id, "ready")
             progress.update({
@@ -558,70 +591,97 @@ class LeadDiscoveryService:
             progress["current_step"] = "Search stopped"
             self.jobs.fail(user_id, job_id, str(exc), progress)
 
-    def _run_apollo(
+    def _run_company_search(
         self, *, user_id: str, job_id: str, list_id: str, niche: str,
-        location: str | None, target_count: int, credentials: dict, crawl_websites: bool,
+        location: str | None, target_count: int, credentials: dict,
+        provider_names: list[str], crawl_websites: bool,
     ) -> None:
-        """Map structured companies directly; never parse them as SERP snippets."""
+        """Structured adapters; bounded failover only within the selected group."""
         found = self.leads.count_leads(user_id, list_id)
         progress = {
             "list_id": list_id, "target_count": target_count, "found_count": found,
-            "search_provider": "apollo", "ai_provider": None,
-            "current_step": "Searching Apollo companies", "progress_percent": 2,
+            "search_provider": ", ".join(provider_names), "ai_provider": None,
+            "current_step": "Searching companies", "progress_percent": 2,
             "search_calls": 0, "websites_checked": 0, "errors": [],
         }
         self.jobs.start(user_id, job_id, progress)
         self.leads.set_lead_list_status(user_id, list_id, "searching")
-        client = ApolloCompanySearchClient(credentials["api_key"])
-        per_page = min(100, target_count)
-        max_pages = min(10, max(1, math.ceil(target_count / per_page) * 2))
         seen: set[str] = set()
         crawl_limit = min(20, target_count) if crawl_websites else 0
+        any_success = False
+        last_provider_failed = False
         try:
-            for page in range(1, max_pages + 1):
-                if found >= target_count:
+            for provider in provider_names:
+                if found >= target_count or progress["search_calls"] >= 10:
                     break
-                progress["search_calls"] += 1
-                progress["current_step"] = f"Searching Apollo companies (page {page})"
-                self.jobs.progress(user_id, job_id, progress)
-                result = client.search_companies(niche, location=location, page=page, per_page=per_page)
-                batch: list[ParsedLead] = []
-                new_identities = 0
-                for lead in result.leads:
-                    identity = lead_identity(lead)
-                    if not identity or identity in seen:
-                        continue
-                    seen.add(identity)
-                    new_identities += 1
-                    if lead.website and progress["websites_checked"] < crawl_limit:
-                        try:
-                            lead = _merge_crawl(lead, self.crawler)
-                        except Exception:
-                            # An unavailable company website must not discard
-                            # Apollo's structured company record.
-                            pass
-                        progress["websites_checked"] += 1
-                    batch.append(lead)
-                    if found + len(batch) >= target_count:
-                        break
-                if batch:
-                    added, _, _ = self.leads.import_parsed_leads(user_id, list_id, batch)
-                    found += len(added)
-                progress.update({"found_count": found, "progress_percent": min(95, int(found / target_count * 100))})
-                self.jobs.progress(user_id, job_id, progress)
-                if not result.has_more or not new_identities:
+                if provider not in COMPANY_SEARCH_ADAPTERS:
+                    raise ProviderRequestError("No company-search adapter is implemented for this provider.")
+                cls = COMPANY_SEARCH_ADAPTERS[provider]
+                client = cls(credentials[provider]["api_key"])
+                per_page = 25 if provider == "prospeo" else min(100, target_count)
+                max_pages = min(10, max(1, math.ceil(target_count / per_page) * 2))
+                provider_found = 0
+                last_provider_failed = False
+                try:
+                    for page in range(1, max_pages + 1):
+                        if found >= target_count or progress["search_calls"] >= 10:
+                            break
+                        progress["search_calls"] += 1
+                        progress["current_step"] = f"Searching {provider.title()} companies (page {page})"
+                        self.jobs.progress(user_id, job_id, progress)
+                        result = client.search_companies(niche, location=location, page=page, per_page=per_page)
+                        any_success = True
+                        batch: list[ParsedLead] = []
+                        new_identities = 0
+                        for lead in result.leads:
+                            if identity_issue(asdict(lead)):
+                                continue
+                            identity = lead_identity(lead)
+                            if not identity or identity in seen:
+                                continue
+                            seen.add(identity)
+                            new_identities += 1
+                            if lead.website and progress["websites_checked"] < crawl_limit:
+                                try:
+                                    lead = _merge_crawl(lead, self.crawler)
+                                except Exception:
+                                    pass
+                                progress["websites_checked"] += 1
+                            if identity_issue(asdict(lead)):
+                                continue
+                            batch.append(lead)
+                            if found + len(batch) >= target_count:
+                                break
+                        if batch:
+                            added, _, _ = self.leads.import_parsed_leads(user_id, list_id, batch)
+                            found += len(added)
+                            provider_found += len(added)
+                        progress.update({"found_count": found, "progress_percent": min(95, int(found / target_count * 100))})
+                        self.jobs.progress(user_id, job_id, progress)
+                        if not result.has_more or not new_identities:
+                            break
+                except Exception as exc:
+                    last_provider_failed = True
+                    message = str(exc) if isinstance(exc, ProviderRequestError) else f"{provider.title()} company search failed. Please retry."
+                    progress["errors"].append(message)
+                    self.jobs.progress(user_id, job_id, progress)
+                    # A saved key can lack only this endpoint. Do not disconnect it.
+                    continue
+                # Do not spend on a second database once this source supplied leads.
+                if provider_found:
                     break
-            progress.update({
-                "found_count": self.leads.count_leads(user_id, list_id),
-                "progress_percent": 100,
-                "current_step": "Complete" if found else "No matching Apollo companies found",
-            })
+            if last_provider_failed or not any_success:
+                raise ProviderRequestError(progress["errors"][-1] if progress["errors"] else "No company-search source completed successfully.")
+            if found < target_count and progress["search_calls"] >= 10:
+                progress["errors"].append("The job reached its 10-page company-search budget. Saved results are available; the target count is not guaranteed.")
+            progress.update({"found_count": self.leads.count_leads(user_id, list_id), "progress_percent": 100,
+                             "current_step": "Complete" if found else "No matching companies found"})
             self.leads.set_lead_list_status(user_id, list_id, "ready")
             self.jobs.complete(user_id, job_id, progress)
         except Exception as exc:
-            # A valid auth/health key can still lack company-search permissions.
-            # Do not disconnect the key and break its working enrichment access.
-            message = str(exc) if isinstance(exc, ProviderRequestError) else "Apollo company search failed. Please retry."
-            progress.update({"current_step": "Search stopped", "errors": [message], "found_count": found})
+            message = str(exc) if isinstance(exc, ProviderRequestError) else "Company search failed. Please retry."
+            progress.update({"current_step": "Search stopped", "found_count": found})
+            if not progress["errors"] or progress["errors"][-1] != message:
+                progress["errors"].append(message)
             self.leads.set_lead_list_status(user_id, list_id, "partial_failed" if found else "failed")
             self.jobs.fail(user_id, job_id, message, progress)

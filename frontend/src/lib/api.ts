@@ -33,6 +33,8 @@ export type Lead = {
   id: string
   list_id: string
   company_name: string | null
+  company_name_status?: string | null
+  outreach_block_reason?: string | null
   website: string | null
   domain: string | null
   first_name: string | null
@@ -252,6 +254,10 @@ export function getApiUrl() {
 export type ProviderConnection = {
   provider: string
   category: 'search' | 'ai' | 'enrichment'
+  capabilities?: string[]
+  discovery_kind?: 'web' | 'companies' | null
+  priority?: number
+  usage_note?: string
   label: string
   description: string
   status: string
@@ -327,8 +333,8 @@ export async function startAutomatedSearch(
     niche: string
     location?: string
     target_count: number
-    search_provider: 'auto' | 'serper' | 'brave' | 'apollo'
-    ai_provider: 'auto' | 'none' | 'gemini' | 'openai'
+    search_provider: string
+    ai_provider: string
     crawl_websites: boolean
   },
 ): Promise<AutomatedSearchStart> {
@@ -351,7 +357,7 @@ export type EnrichmentStart = {
 
 export async function startLeadEnrichment(
   idToken: string,
-  input: { lead_ids: string[]; provider: 'auto' | 'prospeo' | 'apollo'; target_titles: string[] },
+  input: { lead_ids: string[]; provider: string; target_titles: string[] },
 ): Promise<EnrichmentStart> {
   return authRequest<EnrichmentStart>('/api/v1/leads/enrich', idToken, {
     method: 'POST',
@@ -446,6 +452,9 @@ export type CampaignCreateResult = {
   preview: CampaignPreviewItem[]
   suppressed_count: number
   missing_email_count: number
+  unsafe_count?: number
+  duplicate_count?: number
+  safety_warnings?: string[]
 }
 
 export async function getOutreachSnapshot(idToken: string, force = false): Promise<{ templates: EmailTemplate[]; senders: SenderConnection[]; campaigns: Campaign[]; replies: OutreachReply[] }> {

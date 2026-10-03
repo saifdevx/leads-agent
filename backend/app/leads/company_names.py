@@ -44,6 +44,21 @@ def _display_text(value: object) -> str:
     return re.sub(r"\s+", " ", text).strip(" -–—|•·, ")
 
 
+# Rank/listicle headings describe many companies, not one. Keep legitimate
+# brands such as Top Roofing Ltd, 3M and M21 Roofing LTD intact.
+_DIRECTORY = re.compile(
+    r"(?:\b(?:top|best|leading)\s+\d{1,4}\b|"
+    r"\b(?:list|directory|database|ranking|roundup)\s+of\b|"
+    r"\b(?:companies|businesses|installers|contractors|roofers|agencies|firms|suppliers)\s+(?:based\s+)?(?:in|near|across)\b|"
+    r"\b(?:best|top|leading)\s+(?:[\w&'-]+\s+){0,4}(?:companies|businesses|installers|contractors|agencies|firms|suppliers)\b|"
+    r"\b\d{1,4}\s+(?:best|top|leading)\b)", re.IGNORECASE,
+)
+
+
+def is_directory_title(value: object) -> bool:
+    return bool(_DIRECTORY.search(_display_text(value)))
+
+
 def clean_company_name(value: object) -> str | None:
     """Return a plausible standalone name, never a truncated marketing caption."""
     raw = str(value or "")
@@ -56,7 +71,7 @@ def clean_company_name(value: object) -> str | None:
         return None
     if re.search(r"\.\.+|…|https?://|www\.|[@#<>\n\r]|[!?]", html.unescape(raw), re.IGNORECASE):
         return None
-    if _CAPTION.search(text):
+    if _CAPTION.search(text) or is_directory_title(text):
         return None
     if normalized.startswith(("expert ", "professional ")) and " services" in normalized:
         return None

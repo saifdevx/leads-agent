@@ -5,6 +5,7 @@ from dataclasses import replace
 from typing import Mapping
 from urllib.parse import unquote, urlparse
 
+from app.leads.identity import identity_issue
 from app.leads.company_names import clean_company_name, company_from_caption
 from app.leads.parser import ParsedLead, PUBLIC_EMAIL_DOMAINS, is_generic_company_name, valid_phone
 
@@ -207,6 +208,8 @@ def infer_domain(data: Mapping[str, object]) -> str | None:
 
 
 def infer_company_name(data: Mapping[str, object]) -> str | None:
+    if identity_issue(data) or data.get("outreach_block_reason"):
+        return None
     current = clean_company_name(data.get("company_name"))
     if current:
         return current
@@ -263,6 +266,8 @@ def repair_lead_row(row: Mapping[str, object], *, list_location: str | None = No
     if domain:
         repaired["domain"] = domain
 
+    issue = identity_issue(repaired) or repaired.get("outreach_block_reason")
+    repaired["outreach_block_reason"] = issue
     current_name = str(repaired.get("company_name") or "").strip()
     inferred_name = infer_company_name(repaired)
     if not clean_company_name(current_name):
@@ -270,6 +275,7 @@ def repair_lead_row(row: Mapping[str, object], *, list_location: str | None = No
         # to the public LeadResponse or written over historical DB records.
         repaired.setdefault("_company_name_original", current_name)
     repaired["company_name"] = inferred_name
+    repaired["company_name_status"] = "review_required" if issue else ("unknown" if not inferred_name else "inferred" if repaired.get("_company_name_original") is not None else "existing")
 
     repaired["phone"] = valid_phone(str(repaired.get("phone") or "").strip() or None)
 
@@ -297,7 +303,7 @@ def repair_parsed_lead(lead: ParsedLead, *, list_location: str | None = None) ->
     )
     return replace(
         lead,
-        company_name=data.get("company_name"),
+        company_name=lead.company_name if data.get("outreach_block_reason") else data.get("company_name"),
         domain=data.get("domain"),
         email=data.get("email"),
         phone=data.get("phone"),

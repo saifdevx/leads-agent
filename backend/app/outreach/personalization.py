@@ -31,7 +31,7 @@ class CompanyNamePreparer:
         ambiguous: list[tuple[int, dict]] = []
         for index, (original, repaired) in enumerate(zip(leads, output)):
             raw_name = original.get("_company_name_original", original.get("company_name"))
-            if not clean_company_name(raw_name):
+            if not repaired.get("outreach_block_reason") and not clean_company_name(raw_name):
                 evidence = {**original, "company_name": raw_name}
                 ambiguous.append((index, evidence))
         if not ambiguous:
@@ -52,6 +52,7 @@ class CompanyNamePreparer:
             website_name = website_names.get(domain or "")
             if website_name:
                 output[index]["company_name"] = website_name
+                output[index]["company_name_status"] = "website_evidence"
                 continue
             if len(records) < self.max_ai_records:
                 record_id = f"r{index}"

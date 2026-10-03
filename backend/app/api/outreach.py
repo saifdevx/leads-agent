@@ -340,6 +340,9 @@ def create_campaign(data: CampaignCreate, current_user: AuthenticatedUser = Depe
             preview=[CampaignPreviewItem(**p) for p in preview],
             suppressed_count=suppressed,
             missing_email_count=missing,
+            unsafe_count=campaign.get("unsafe_count", 0),
+            duplicate_count=campaign.get("duplicate_count", 0),
+            safety_warnings=campaign.get("safety_warnings", []),
         )
     except (OutreachNotFoundError, ValueError) as exc:
         raise HTTPException(400, str(exc)) from exc

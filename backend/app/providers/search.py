@@ -126,4 +126,9 @@ def validate_search_provider(provider: str, api_key: str) -> None:
     if provider == "brave":
         BraveSearchClient(api_key).search("OpenAI", count=1)
         return
+    if provider in {"tavily", "exa"}:
+        from app.providers.web_search import ExaSearchClient, TavilySearchClient
+        client = TavilySearchClient if provider == "tavily" else ExaSearchClient
+        client(api_key).search("business websites", num=1)
+        return
     raise ValueError(provider)

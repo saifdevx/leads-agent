@@ -10,6 +10,8 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
+from app.leads.identity import domain_key, host_of, shared_host
+from app.leads.parser import PUBLIC_EMAIL_DOMAINS
 from app.leads.company_names import clean_company_name
 from app.leads.parser import EMAIL_RE, PHONE_RE, SOCIAL_HOSTS, _company_from_domain, is_generic_company_name, valid_phone
 
@@ -75,7 +77,7 @@ class _PageParser(HTMLParser):
 
 def _ensure_public_host(url: str) -> None:
     parsed = urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname or parsed.username or parsed.password:
         raise UnsafeUrlError("Only public HTTP/HTTPS websites may be crawled.")
     host = parsed.hostname
     if host.lower() in {"localhost", "localhost.localdomain"}:
@@ -117,9 +119,12 @@ def _best_email(emails: list[str], final_url: str) -> str | None:
         cleaned.append(value)
     if not cleaned:
         return None
-    same_domain = [email for email in cleaned if email.rsplit("@", 1)[1].removeprefix("www.") == website_host]
+    same_domain = [email for email in cleaned if domain_key(email.rsplit("@", 1)[1]) == domain_key(website_host)]
+    # A footer may advertise the web designer or data-directory operator. Do
+    # not treat an unrelated corporate-domain email as this business contact.
+    public_mailboxes = [email for email in cleaned if email.rsplit("@", 1)[1] in PUBLIC_EMAIL_DOMAINS]
     preferred_locals = ("hello", "info", "contact", "sales", "office", "team", "support")
-    for pool in (same_domain, cleaned):
+    for pool in (same_domain, public_mailboxes):
         for prefix in preferred_locals:
             match = next((email for email in pool if email.split("@", 1)[0].startswith(prefix)), None)
             if match:
@@ -129,7 +134,7 @@ def _best_email(emails: list[str], final_url: str) -> str | None:
     return None
 
 
-def _jsonld_business_names(parts: list[str]) -> list[str]:
+def _jsonld_business_names(parts: list[str], final_url: str | None = None) -> list[str]:
     names: list[str] = []
     for raw in parts:
         try:
@@ -147,6 +152,9 @@ def _jsonld_business_names(parts: list[str]) -> list[str]:
             item_type = item.get("@type")
             types = {str(item_type)} if not isinstance(item_type, list) else {str(value) for value in item_type}
             if types.intersection({"Organization", "LocalBusiness", "Corporation", "ProfessionalService", "HomeAndConstructionBusiness", "RoofingContractor", "GeneralContractor", "Plumber", "Electrician", "Dentist", "AccountingService"}):
+                named_url = item.get("url") or item.get("@id")
+                if final_url and named_url and host_of(named_url) and domain_key(host_of(named_url)) != domain_key(host_of(final_url)):
+                    continue
                 name = item.get("name")
                 if isinstance(name, str) and name.strip():
                     names.append(name.strip())
@@ -154,7 +162,7 @@ def _jsonld_business_names(parts: list[str]) -> list[str]:
 
 
 def _best_business_name(parser: _PageParser, final_url: str, *, allow_domain_fallback: bool = True) -> str | None:
-    candidates = [*_jsonld_business_names(parser.jsonld_parts), *parser.meta_names]
+    candidates = [*_jsonld_business_names(parser.jsonld_parts, final_url), *parser.meta_names]
     title = " ".join(parser.title_parts).strip()
     if title:
         for sep in (" | ", " – ", " — ", " - "):

@@ -13,6 +13,10 @@ class ProviderConnectionResponse(BaseModel):
     category: str
     label: str
     description: str
+    capabilities: list[str] = Field(default_factory=list)
+    discovery_kind: str | None = None
+    priority: int = 100
+    usage_note: str = ""
     status: str
     connected: bool
     model: str | None = None

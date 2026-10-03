@@ -2,6 +2,10 @@ from app.outreach import sending
 
 
 class Repo:
+    def assert_outgoing_safe(self, user_id, to_email, subject, body):
+        from app.outreach.safety import assert_message_safe
+        assert_message_safe(to_email, subject, body)
+
     def get_sender(self, user_id, sender_id, with_credentials=False):
         assert with_credentials is True
         return {

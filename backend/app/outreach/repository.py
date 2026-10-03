@@ -4,6 +4,9 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from app.db.client import TursoHttpClient
+from app.leads.identity import identity_issue
+from app.leads.smart_data import repair_lead_row
+from app.outreach.safety import assert_message_safe, message_issue
 from app.outreach.rendering import render_template, uses_company_personalization
 from app.providers.security import CredentialCipher
 
@@ -231,7 +234,12 @@ class OutreachRepository:
         valid = []
         missing = 0
         skipped = 0
-        for lead in leads:
+        unsafe = 0
+        duplicates = 0
+        reasons: list[str] = []
+        seen_emails: set[str] = set()
+        for original in leads:
+            lead = repair_lead_row(original)
             email = str(lead.get("email") or "").strip().lower()
             if not email:
                 missing += 1
@@ -239,9 +247,20 @@ class OutreachRepository:
             if email in suppressed:
                 skipped += 1
                 continue
+            issue = identity_issue(lead) or lead.get("outreach_block_reason")
+            if issue:
+                unsafe += 1
+                if str(issue) not in reasons:
+                    reasons.append(str(issue))
+                continue
+            if email in seen_emails:
+                duplicates += 1
+                continue
+            seen_emails.add(email)
             valid.append(lead)
         if not valid:
-            raise ValueError("No selected leads have sendable email addresses.")
+            detail = (" " + " ".join(reasons[:3])) if reasons else ""
+            raise ValueError("No selected leads have safe, sendable email addresses." + detail)
 
         # Resolve once before rendering every subject/body/follow-up. Queued
         # copies remain exactly the drafts the user reviewed and approved.
@@ -251,6 +270,28 @@ class OutreachRepository:
         if self.company_name_preparer is not None and needs_company:
             valid = self.company_name_preparer.prepare(user_id, valid)
 
+        prepared_messages: dict[str, list[tuple[int, str, str]]] = {}
+        safe_leads = []
+        for lead in valid:
+            messages = []
+            issue = None
+            for index, step_template in enumerate(campaign_templates):
+                subject = render_template(step_template["subject"], lead, sender, subject=True)
+                body = render_template(step_template["body"], lead, sender)
+                issue = message_issue(str(lead["email"]), subject, body, lead)
+                if issue:
+                    break
+                messages.append((index, subject, body))
+            if issue:
+                unsafe += 1
+                if issue not in reasons:
+                    reasons.append(issue)
+            else:
+                safe_leads.append(lead)
+                prepared_messages[lead["id"]] = messages
+        valid = safe_leads
+        if not valid:
+            raise ValueError("Outreach held. " + " ".join(reasons[:3]))
         ts = now()
         cid = str(uuid4())
         self.database.execute(
@@ -272,7 +313,7 @@ class OutreachRepository:
                 data.timezone,
                 data.min_interval_seconds,
                 len(valid),
-                skipped,
+                skipped + unsafe + duplicates,
                 1 if data.stop_on_reply else 0,
                 ts,
                 ts,
@@ -298,10 +339,7 @@ class OutreachRepository:
 
         preview = []
         for lead in valid:
-            all_templates = [(0, template)] + [(idx, tpl) for idx, (_, tpl) in enumerate(followup_templates, start=1)]
-            for step_number, step_template in all_templates:
-                subject = render_template(step_template["subject"], lead, sender)
-                body = render_template(step_template["body"], lead, sender)
+            for step_number, subject, body in prepared_messages[lead["id"]]:
                 status = "draft" if step_number == 0 else "waiting"
                 kind = "initial" if step_number == 0 else "followup"
                 mid = str(uuid4())
@@ -341,12 +379,17 @@ class OutreachRepository:
                         }
                     )
         self.database.execute_batch(statements)
-        return self._campaign_row(user_id, cid), preview, skipped, missing
+        campaign = self._campaign_row(user_id, cid)
+        campaign["unsafe_count"] = unsafe
+        campaign["duplicate_count"] = duplicates
+        campaign["safety_warnings"] = reasons[:5]
+        return campaign, preview, skipped, missing
 
     def approve_campaign(self, user_id, campaign_id):
         campaign = self._campaign_row(user_id, campaign_id)
         if campaign["status"] not in ("draft", "paused"):
             raise ValueError("Only draft or paused campaigns can be approved.")
+        self.assert_campaign_safe(user_id, campaign_id)
         ts = now()
         self.database.execute_batch(
             [
@@ -368,7 +411,13 @@ class OutreachRepository:
         allowed = {"paused", "sending", "cancelled"}
         if status not in allowed:
             raise ValueError("Invalid campaign state.")
-        self._campaign_row(user_id, campaign_id)
+        campaign = self._campaign_row(user_id, campaign_id)
+        if status == "sending":
+            if not campaign.get("approved_at"):
+                raise ValueError("Preview and approve this campaign before starting it.")
+            if campaign["status"] != "paused":
+                raise ValueError("Only an approved paused campaign can be resumed.")
+            self.assert_campaign_safe(user_id, campaign_id)
         ts = now()
         self.database.execute(
             "UPDATE campaigns SET status=?,updated_at=? WHERE user_id=? AND id=?",
@@ -435,12 +484,13 @@ class OutreachRepository:
         if campaign["status"] in {"cancelled", "completed"}:
             raise ValueError("This campaign is no longer accepting retries.")
         rows = self.database.execute(
-            "SELECT id,to_email,lead_id FROM email_messages WHERE user_id=? AND campaign_id=? AND id=? AND status='failed'",
+            "SELECT id,to_email,lead_id,subject,body FROM email_messages WHERE user_id=? AND campaign_id=? AND id=? AND status='failed'",
             (user_id, campaign_id, message_id),
         ).rows
         if not rows:
             raise ValueError("Only failed messages can be retried.")
         message = rows[0]
+        self.assert_outgoing_safe(user_id, message["to_email"], message["subject"], message["body"])
         if self.is_suppressed(user_id, message["to_email"]):
             raise ValueError("This recipient is suppressed.")
         if self._lead_has_reply(campaign_id, message["lead_id"]):
@@ -460,6 +510,28 @@ class OutreachRepository:
                 ),
             ]
         )
+
+    def assert_outgoing_safe(self, user_id: str, to_email: str, subject: str, body: str) -> None:
+        """Common gate for manual Quick Send, queued initial emails and follow-ups."""
+        assert_message_safe(to_email, subject, body)
+        rows = self.database.execute(
+            "SELECT company_name,website,domain,source_url,email FROM leads WHERE user_id=? AND LOWER(email)=?",
+            (user_id, to_email.strip().lower()),
+        ).rows
+        for row in rows:
+            assert_message_safe(to_email, subject, body, row)
+
+    def assert_campaign_safe(self, user_id: str, campaign_id: str) -> None:
+        # One joined read, not an HTTP database round trip per recipient. Existing
+        # approved copies are inspected, never regenerated behind the user's back.
+        rows = self.database.execute(
+            """SELECT m.to_email,m.subject,m.body,l.company_name,l.website,l.domain,l.source_url
+            FROM email_messages m LEFT JOIN leads l ON l.id=m.lead_id AND l.user_id=m.user_id
+            WHERE m.user_id=? AND m.campaign_id=? AND m.status IN ('draft','waiting','queued','failed')""",
+            (user_id, campaign_id),
+        ).rows
+        for row in rows:
+            assert_message_safe(row["to_email"], row["subject"], row["body"], row)
 
     # Worker
     def due_messages(self, limit=10):

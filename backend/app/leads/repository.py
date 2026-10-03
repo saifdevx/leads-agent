@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from uuid import uuid4
 
 from app.db.client import TursoHttpClient
+from app.leads.company_names import clean_company_name
 from app.leads.parser import ParsedLead, is_generic_company_name, lead_match_keys
 from app.leads.smart_data import repair_lead_row, repair_parsed_lead
 
@@ -41,7 +42,7 @@ def _to_parsed(row: dict) -> ParsedLead:
 def _better_name(current: str | None, incoming: str | None) -> str | None:
     if not incoming:
         return current
-    if not current or (is_generic_company_name(current) and not is_generic_company_name(incoming)):
+    if not current or (not clean_company_name(current) and clean_company_name(incoming)):
         return incoming
     return current
 
