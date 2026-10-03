@@ -78,7 +78,7 @@ class AutomatedLeadSearchRequest(BaseModel):
     niche: str = Field(min_length=2, max_length=120)
     location: str | None = Field(default=None, max_length=120)
     target_count: int = Field(default=100, ge=1, le=500)
-    search_provider: str = Field(default="auto", pattern="^(auto|serper|brave)$")
+    search_provider: str = Field(default="auto", pattern="^(auto|serper|brave|apollo)$")
     ai_provider: str = Field(default="auto", pattern="^(auto|none|gemini|openai)$")
     crawl_websites: bool = True
 

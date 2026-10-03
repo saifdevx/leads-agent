@@ -34,12 +34,13 @@ PROVIDERS: dict[str, dict[str, str | None]] = {
     "apollo": {
         "category": "enrichment",
         "label": "Apollo",
-        "description": "Find owners, founders and other decision-makers, with optional contact enrichment.",
+        "description": "Search companies by niche and headquarters location, plus optional decision-maker/contact enrichment. Apollo API access and credits apply.",
         "default_model": None,
     },
 }
 
 SEARCH_PROVIDERS = ("serper", "brave")
+DISCOVERY_PROVIDERS = (*SEARCH_PROVIDERS, "apollo")
 AI_PROVIDERS = ("gemini", "openai")
 ENRICHMENT_PROVIDERS = ("prospeo", "apollo")
 

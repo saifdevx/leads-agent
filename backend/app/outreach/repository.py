@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
 from app.db.client import TursoHttpClient
-from app.outreach.rendering import render_template
+from app.outreach.rendering import render_template, uses_company_personalization
 from app.providers.security import CredentialCipher
 
 
@@ -17,9 +17,10 @@ class OutreachNotFoundError(LookupError):
 
 
 class OutreachRepository:
-    def __init__(self, database: TursoHttpClient, cipher: CredentialCipher):
+    def __init__(self, database: TursoHttpClient, cipher: CredentialCipher, *, company_name_preparer=None):
         self.database = database
         self.cipher = cipher
+        self.company_name_preparer = company_name_preparer
 
     # Templates
     def list_templates(self, user_id):
@@ -241,6 +242,14 @@ class OutreachRepository:
             valid.append(lead)
         if not valid:
             raise ValueError("No selected leads have sendable email addresses.")
+
+        # Resolve once before rendering every subject/body/follow-up. Queued
+        # copies remain exactly the drafts the user reviewed and approved.
+        campaign_templates = [template, *[tpl for _, tpl in followup_templates]]
+        needs_company = any(uses_company_personalization(tpl[field])
+                            for tpl in campaign_templates for field in ("subject", "body"))
+        if self.company_name_preparer is not None and needs_company:
+            valid = self.company_name_preparer.prepare(user_id, valid)
 
         ts = now()
         cid = str(uuid4())

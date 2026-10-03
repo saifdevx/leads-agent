@@ -1,0 +1,17 @@
+test_01_read_only_check_apply_reapply_and_byte_exact_rollback (__main__.InstallerTests.test_01_read_only_check_apply_reapply_and_byte_exact_rollback) ... ok
+test_02_modified_destination_is_not_overwritten (__main__.InstallerTests.test_02_modified_destination_is_not_overwritten) ... ok
+test_03_unchanged_contract_drift_is_rejected (__main__.InstallerTests.test_03_unchanged_contract_drift_is_rejected) ... ok
+test_04_conflicting_new_file_is_not_overwritten (__main__.InstallerTests.test_04_conflicting_new_file_is_not_overwritten) ... ok
+test_05_tampered_payload_is_rejected_before_writes (__main__.InstallerTests.test_05_tampered_payload_is_rejected_before_writes) ... ok
+test_06_symlink_destination_is_rejected (__main__.InstallerTests.test_06_symlink_destination_is_rejected) ... ok
+test_07_path_traversal_is_rejected (__main__.InstallerTests.test_07_path_traversal_is_rejected) ... ok
+test_08_rollback_preserves_later_edits_and_other_files (__main__.InstallerTests.test_08_rollback_preserves_later_edits_and_other_files) ... ok
+test_09_failed_apply_automatically_restores_prior_writes (__main__.InstallerTests.test_09_failed_apply_automatically_restores_prior_writes) ... ok
+test_10_damaged_backup_does_not_partially_roll_back (__main__.InstallerTests.test_10_damaged_backup_does_not_partially_roll_back) ... ok
+test_11_windows_crlf_checkout_applies_and_restores_exact_original_bytes (__main__.InstallerTests.test_11_windows_crlf_checkout_applies_and_restores_exact_original_bytes) ... ok
+test_12_crlf_only_change_after_apply_is_idempotent_and_rollback_safe (__main__.InstallerTests.test_12_crlf_only_change_after_apply_is_idempotent_and_rollback_safe) ... ok
+
+----------------------------------------------------------------------
+Ran 12 tests in 10.382s
+
+OK

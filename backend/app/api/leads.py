@@ -14,6 +14,7 @@ from app.leads.discovery import LeadDiscoveryService
 from app.leads.enrichment import LeadEnrichmentService
 from app.leads.exporting import export_csv, export_xlsx, filter_export_rows
 from app.leads.file_import import parse_lead_file
+from app.providers.catalog import DISCOVERY_PROVIDERS
 from app.providers.dependencies import get_provider_repository
 from app.providers.repository import ProviderRepository
 from app.leads.parser import parse_leads
@@ -89,12 +90,12 @@ def start_automated_search(
     job_repository: JobRepository = Depends(get_job_repository),
 ) -> AutomatedLeadSearchResponse:
     connected = provider_repository.connected_providers(current_user.uid)
-    available_search = [name for name in ("serper", "brave") if name in connected]
+    available_search = [name for name in DISCOVERY_PROVIDERS if name in connected]
     if request.search_provider == "auto":
         if not available_search:
             raise HTTPException(
                 status_code=400,
-                detail="Connect Serper or Brave Search in Settings before running automatic search.",
+                detail="Connect Serper, Brave Search, or Apollo in Settings before running automatic search.",
             )
     elif request.search_provider not in available_search:
         raise HTTPException(status_code=400, detail=f"{request.search_provider} is not connected.")

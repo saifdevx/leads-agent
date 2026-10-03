@@ -2,15 +2,18 @@ from __future__ import annotations
 
 import math
 import re
-from dataclasses import replace
+from dataclasses import asdict, replace
 from urllib.parse import urlparse
 
 from app.jobs.repository import JobRepository
+from app.leads.company_names import clean_company_name, is_suspicious_company_name, name_is_grounded
 from app.leads.crawler import WebsiteCrawler
 from app.leads.parser import ParsedLead, is_generic_company_name, lead_identity, parse_leads, valid_phone
 from app.leads.repository import LeadRepository
-from app.leads.smart_data import data_completeness, repair_parsed_lead
+from app.leads.smart_data import data_completeness, infer_company_name, repair_parsed_lead
 from app.leads.search_queries import generate_search_queries
+from app.providers.apollo_search import ApolloCompanySearchClient
+from app.providers.catalog import DISCOVERY_PROVIDERS
 from app.providers.ai import GeminiExtractor, OpenAIExtractor
 from app.providers.repository import ProviderRepository
 from app.providers.search import (
@@ -186,6 +189,10 @@ def _needs_ai(results: list[SearchResult], leads: list[ParsedLead]) -> bool:
         return False
     if not leads:
         return True
+    # A full email/phone record can still have a caption instead of a company.
+    # Do this before deterministic repair makes a domain-derived fallback.
+    if any(is_suspicious_company_name(lead.company_name) for lead in leads):
+        return True
     coverage = len(leads) / max(1, len(results))
     completeness = sum(
         data_completeness({
@@ -207,6 +214,7 @@ def _needs_ai(results: list[SearchResult], leads: list[ParsedLead]) -> bool:
 def _merge_candidate_lists(primary: list[ParsedLead], secondary: list[ParsedLead]) -> list[ParsedLead]:
     output: list[ParsedLead] = []
     by_identity: dict[str, int] = {}
+    trusted_names: dict[str, bool] = {}
 
     def quality(lead: ParsedLead) -> int:
         return data_completeness({
@@ -222,6 +230,7 @@ def _merge_candidate_lists(primary: list[ParsedLead], secondary: list[ParsedLead
         })
 
     for lead in [*primary, *secondary]:
+        has_explicit_name = bool(clean_company_name(lead.company_name))
         lead = repair_parsed_lead(lead)
         identity = lead_identity(lead)
         if not identity:
@@ -230,8 +239,18 @@ def _merge_candidate_lists(primary: list[ParsedLead], secondary: list[ParsedLead
         if existing is None:
             by_identity[identity] = len(output)
             output.append(lead)
-        elif quality(lead) > quality(output[existing]):
-            output[existing] = lead
+            trusted_names[identity] = has_explicit_name
+        else:
+            old = output[existing]
+            preferred, other = (lead, old) if quality(lead) > quality(old) else (old, lead)
+            values = {key: value if value is not None else asdict(other)[key]
+                      for key, value in asdict(preferred).items()}
+            if trusted_names[identity]:
+                values["company_name"] = old.company_name
+            elif has_explicit_name:
+                values["company_name"] = lead.company_name
+            output[existing] = ParsedLead(**values)
+            trusted_names[identity] = trusted_names[identity] or has_explicit_name
     return output
 
 
@@ -249,21 +268,35 @@ def _ai_leads(extractor, results: list[SearchResult], niche: str, location: str 
             evidence = next((result for result in batch if grounded_source and result.url.rstrip("/") == grounded_source.rstrip("/")), None)
             if not evidence and grounded_source:
                 grounded_host = _domain(grounded_source)
-                evidence = next((result for result in batch if _domain(result.url) == grounded_host), None)
-
-            website = _ground_url(item.website, batch)
-            linkedin_url = _ground_url(item.linkedin_url, batch)
-            instagram_url = _ground_url(item.instagram_url, batch)
-            facebook_url = _ground_url(item.facebook_url, batch)
+                # Different posts on instagram.com are not the same company.
+                if grounded_host and grounded_host not in SOCIAL_DOMAINS:
+                    evidence = next((result for result in batch if _domain(result.url) == grounded_host), None)
+            if evidence is None:
+                continue
+            # Validate each field against this result, never the entire batch.
+            record_results = [evidence]
+            evidence_text = _evidence_text(record_results)
+            website = _ground_url(item.website, record_results)
+            linkedin_url = _ground_url(item.linkedin_url, record_results)
+            instagram_url = _ground_url(item.instagram_url, record_results)
+            facebook_url = _ground_url(item.facebook_url, record_results)
             email = _ground_email(item.email, evidence_text)
             phone = _ground_phone(item.phone, evidence_text)
+            fallback_name = infer_company_name({
+                "company_name": evidence.title, "website": website, "email": email,
+                "source_url": evidence.url, "instagram_url": instagram_url,
+                "linkedin_url": linkedin_url, "facebook_url": facebook_url,
+            })
+            company_name = clean_company_name(item.business_name)
+            if not company_name or not name_is_grounded(company_name, evidence_text + "\n" + (fallback_name or "")):
+                company_name = fallback_name
 
             domain = _domain(website)
             if domain in SOCIAL_DOMAINS:
                 website = None
                 domain = None
             lead = ParsedLead(
-                company_name=item.business_name,
+                company_name=company_name,
                 website=website,
                 domain=domain,
                 first_name=first_name,
@@ -292,7 +325,8 @@ def _merge_crawl(lead: ParsedLead, crawler: WebsiteCrawler) -> ParsedLead:
     if not lead.website:
         return lead
     data = crawler.crawl(lead.website)
-    better_name = data.business_name if is_generic_company_name(lead.company_name) and data.business_name else lead.company_name
+    crawled_name = clean_company_name(data.business_name)
+    better_name = crawled_name if is_suspicious_company_name(lead.company_name) and crawled_name else lead.company_name
     return replace(
         lead,
         company_name=better_name,
@@ -322,10 +356,13 @@ class LeadDiscoveryService:
     def _search_providers(credentials: dict[str, dict], requested: str) -> list[str]:
         connected = set(credentials)
         if requested != "auto":
-            return [requested] if requested in connected else []
+            return [requested] if requested in connected and requested in DISCOVERY_PROVIDERS else []
         # Ordered failover. Serper is attempted first; Brave is only used when
         # Serper is unavailable or produces no usable results.
-        return [provider for provider in ("serper", "brave") if provider in connected]
+        web_providers = [provider for provider in ("serper", "brave") if provider in connected]
+        # Preserve existing web-search cost behavior. Use Apollo automatically
+        # when it is the only discovery source; otherwise it is explicit opt-in.
+        return web_providers or (["apollo"] if "apollo" in connected else [])
 
     @staticmethod
     def _ai_extractors(credentials: dict[str, dict], requested: str) -> list[tuple[str, object]]:
@@ -357,8 +394,16 @@ class LeadDiscoveryService:
         credentials = self.providers.connected_credentials(user_id)
         providers = self._search_providers(credentials, search_provider)
         if not providers:
-            self.jobs.fail(user_id, job_id, "Connect Serper or Brave Search in Settings first.")
+            self.jobs.fail(user_id, job_id, "Connect Serper, Brave Search, or Apollo in Settings first.")
             self.leads.set_lead_list_status(user_id, list_id, "failed")
+            return
+
+        if providers == ["apollo"]:
+            self._run_apollo(
+                user_id=user_id, job_id=job_id, list_id=list_id, niche=niche,
+                location=location, target_count=target_count,
+                credentials=credentials["apollo"], crawl_websites=crawl_websites,
+            )
             return
 
         ai_extractors = self._ai_extractors(credentials, ai_provider) if ai_provider != "none" else []
@@ -441,7 +486,6 @@ class LeadDiscoveryService:
 
                 # Zero-credit deterministic extraction runs first.
                 parsed = _deterministic_leads(normalized_results, location)
-                parsed = [repair_parsed_lead(lead, list_location=location) for lead in parsed]
 
                 # AI is a fallback only for ambiguous or low-coverage batches.
                 if ai_extractors and _needs_ai(normalized_results, parsed):
@@ -466,9 +510,10 @@ class LeadDiscoveryService:
                 enriched: list[ParsedLead] = []
                 batch_seen: set[str] = set()
                 for lead in parsed:
-                    if crawl_websites and lead.website and crawled < max_crawls and (not lead.email or is_generic_company_name(lead.company_name)):
+                    if crawl_websites and lead.website and crawled < max_crawls and (not lead.email or is_suspicious_company_name(lead.company_name)):
                         lead = _merge_crawl(lead, self.crawler)
                         crawled += 1
+                    lead = repair_parsed_lead(lead, list_location=location)
                     if not (lead.email or lead.phone or lead.website):
                         continue
                     identity = lead_identity(lead)
@@ -512,3 +557,71 @@ class LeadDiscoveryService:
             progress["errors"] = [*errors[-4:], str(exc)]
             progress["current_step"] = "Search stopped"
             self.jobs.fail(user_id, job_id, str(exc), progress)
+
+    def _run_apollo(
+        self, *, user_id: str, job_id: str, list_id: str, niche: str,
+        location: str | None, target_count: int, credentials: dict, crawl_websites: bool,
+    ) -> None:
+        """Map structured companies directly; never parse them as SERP snippets."""
+        found = self.leads.count_leads(user_id, list_id)
+        progress = {
+            "list_id": list_id, "target_count": target_count, "found_count": found,
+            "search_provider": "apollo", "ai_provider": None,
+            "current_step": "Searching Apollo companies", "progress_percent": 2,
+            "search_calls": 0, "websites_checked": 0, "errors": [],
+        }
+        self.jobs.start(user_id, job_id, progress)
+        self.leads.set_lead_list_status(user_id, list_id, "searching")
+        client = ApolloCompanySearchClient(credentials["api_key"])
+        per_page = min(100, target_count)
+        max_pages = min(10, max(1, math.ceil(target_count / per_page) * 2))
+        seen: set[str] = set()
+        crawl_limit = min(20, target_count) if crawl_websites else 0
+        try:
+            for page in range(1, max_pages + 1):
+                if found >= target_count:
+                    break
+                progress["search_calls"] += 1
+                progress["current_step"] = f"Searching Apollo companies (page {page})"
+                self.jobs.progress(user_id, job_id, progress)
+                result = client.search_companies(niche, location=location, page=page, per_page=per_page)
+                batch: list[ParsedLead] = []
+                new_identities = 0
+                for lead in result.leads:
+                    identity = lead_identity(lead)
+                    if not identity or identity in seen:
+                        continue
+                    seen.add(identity)
+                    new_identities += 1
+                    if lead.website and progress["websites_checked"] < crawl_limit:
+                        try:
+                            lead = _merge_crawl(lead, self.crawler)
+                        except Exception:
+                            # An unavailable company website must not discard
+                            # Apollo's structured company record.
+                            pass
+                        progress["websites_checked"] += 1
+                    batch.append(lead)
+                    if found + len(batch) >= target_count:
+                        break
+                if batch:
+                    added, _, _ = self.leads.import_parsed_leads(user_id, list_id, batch)
+                    found += len(added)
+                progress.update({"found_count": found, "progress_percent": min(95, int(found / target_count * 100))})
+                self.jobs.progress(user_id, job_id, progress)
+                if not result.has_more or not new_identities:
+                    break
+            progress.update({
+                "found_count": self.leads.count_leads(user_id, list_id),
+                "progress_percent": 100,
+                "current_step": "Complete" if found else "No matching Apollo companies found",
+            })
+            self.leads.set_lead_list_status(user_id, list_id, "ready")
+            self.jobs.complete(user_id, job_id, progress)
+        except Exception as exc:
+            # A valid auth/health key can still lack company-search permissions.
+            # Do not disconnect the key and break its working enrichment access.
+            message = str(exc) if isinstance(exc, ProviderRequestError) else "Apollo company search failed. Please retry."
+            progress.update({"current_step": "Search stopped", "errors": [message], "found_count": found})
+            self.leads.set_lead_list_status(user_id, list_id, "partial_failed" if found else "failed")
+            self.jobs.fail(user_id, job_id, message, progress)

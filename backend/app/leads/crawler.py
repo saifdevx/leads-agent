@@ -10,6 +10,7 @@ from urllib.parse import urljoin, urlparse
 
 import httpx
 
+from app.leads.company_names import clean_company_name
 from app.leads.parser import EMAIL_RE, PHONE_RE, SOCIAL_HOSTS, _company_from_domain, is_generic_company_name, valid_phone
 
 
@@ -145,14 +146,14 @@ def _jsonld_business_names(parts: list[str]) -> list[str]:
                 stack.extend(graph)
             item_type = item.get("@type")
             types = {str(item_type)} if not isinstance(item_type, list) else {str(value) for value in item_type}
-            if types.intersection({"Organization", "LocalBusiness", "Corporation", "ProfessionalService", "HomeAndConstructionBusiness"}):
+            if types.intersection({"Organization", "LocalBusiness", "Corporation", "ProfessionalService", "HomeAndConstructionBusiness", "RoofingContractor", "GeneralContractor", "Plumber", "Electrician", "Dentist", "AccountingService"}):
                 name = item.get("name")
                 if isinstance(name, str) and name.strip():
                     names.append(name.strip())
     return names
 
 
-def _best_business_name(parser: _PageParser, final_url: str) -> str | None:
+def _best_business_name(parser: _PageParser, final_url: str, *, allow_domain_fallback: bool = True) -> str | None:
     candidates = [*_jsonld_business_names(parser.jsonld_parts), *parser.meta_names]
     title = " ".join(parser.title_parts).strip()
     if title:
@@ -161,9 +162,11 @@ def _best_business_name(parser: _PageParser, final_url: str) -> str | None:
                 candidates.extend(part.strip() for part in title.split(sep) if part.strip())
         candidates.append(title)
     for candidate in candidates:
-        cleaned = " ".join(candidate.split()).strip()
-        if 2 <= len(cleaned) <= 120 and not is_generic_company_name(cleaned):
+        cleaned = clean_company_name(candidate)
+        if cleaned:
             return cleaned
+    if not allow_domain_fallback:
+        return None
     host = (urlparse(final_url).hostname or "").lower().removeprefix("www.")
     return _company_from_domain(host)
 
@@ -240,9 +243,9 @@ class WebsiteCrawler:
             "Accept": "text/html,application/xhtml+xml",
         }
 
-    def _fetch(self, url: str) -> tuple[str, str]:
+    def _fetch(self, url: str, *, max_requests: int = 4) -> tuple[str, str]:
         current = url
-        for _ in range(4):
+        for _ in range(max_requests):
             _ensure_public_host(current)
             try:
                 with httpx.Client(timeout=self.timeout, follow_redirects=False, headers=self.headers) as client:
@@ -264,6 +267,23 @@ class WebsiteCrawler:
             encoding = response.encoding or "utf-8"
             return raw.decode(encoding, errors="replace"), str(response.url)
         raise RuntimeError("Website redirected too many times.")
+
+    def company_name(self, website: str) -> str | None:
+        """A bounded homepage-only lookup for draft personalization.
+
+        No child-page crawling and at most one redirect. Preserve public-host
+        checks on every request; ignore cross-domain redirects for identity.
+        """
+        try:
+            html, final_url = self._fetch(website, max_requests=2)
+            if not _same_domain(website, final_url):
+                return None
+            parser = _PageParser()
+            parser.feed(html)
+            parser.close()
+            return _best_business_name(parser, final_url, allow_domain_fallback=False)
+        except (RuntimeError, UnsafeUrlError, ValueError):
+            return None
 
     def crawl(self, website: str) -> CrawledContactData:
         try:

@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Icon } from '../components/Icon'
+import { connectedSearchProviders, SEARCH_SOURCES, searchReady, usesApolloSearch, type SearchProvider } from '../lib/searchProviders'
 import {
   ApiRequestError,
   createSearchPlan,
@@ -29,7 +30,7 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
   const [targetCount, setTargetCount] = useState(50)
   const [mode, setMode] = useState<Mode>('automatic')
   const [advanced, setAdvanced] = useState(false)
-  const [searchProvider, setSearchProvider] = useState<'auto' | 'serper' | 'brave'>('auto')
+  const [searchProvider, setSearchProvider] = useState<SearchProvider>('auto')
   const [aiProvider, setAiProvider] = useState<'auto' | 'none' | 'gemini' | 'openai'>('auto')
   const [crawlWebsites, setCrawlWebsites] = useState(true)
   const [autoEnrich, setAutoEnrich] = useState(false)
@@ -51,16 +52,27 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
   const [error, setError] = useState<string | null>(null)
   const [pollWarning, setPollWarning] = useState<string | null>(null)
 
-  async function refreshProviders() {
+  const [providersLoading, setProvidersLoading] = useState(true)
+  const [providerError, setProviderError] = useState<string | null>(null)
+
+  const refreshProviders = useCallback(async () => {
     try {
       const token = await getToken()
-      setProviders(await getProviders(token))
+      setProviders(await getProviders(token, true))
+      setProviderError(null)
     } catch {
-      // The search action will surface a useful error if providers cannot be loaded.
+      setProviderError('Could not refresh provider connections. Try again before starting a search.')
+    } finally {
+      setProvidersLoading(false)
     }
-  }
+  }, [getToken])
 
-  useEffect(() => { void refreshProviders() }, [])
+  useEffect(() => {
+    void refreshProviders()
+    const onFocus = () => { void refreshProviders() }
+    window.addEventListener('focus', onFocus)
+    return () => window.removeEventListener('focus', onFocus)
+  }, [refreshProviders])
 
   async function maybeStartAutoEnrichment(token: string, listId: string | undefined) {
     if (!autoEnrich || !listId || autoEnrichStarted.current) return false
@@ -162,10 +174,11 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
     }
   }, [enrichmentJobId, getToken])
 
-  const connectedSearch = useMemo(() => providers.filter((item) => item.category === 'search' && item.connected), [providers])
+  const connectedSearch = useMemo(() => connectedSearchProviders(providers), [providers])
   const connectedAi = useMemo(() => providers.filter((item) => item.category === 'ai' && item.connected), [providers])
   const connectedEnrichment = useMemo(() => providers.filter((item) => item.category === 'enrichment' && item.connected), [providers])
-  const automaticReady = connectedSearch.length > 0
+  const automaticReady = !providersLoading && !providerError && searchReady(providers, searchProvider)
+  const apolloSearch = usesApolloSearch(providers, searchProvider)
 
   async function startSearch() {
     setBusy('search')
@@ -272,10 +285,12 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
           <div className="mt-2 grid gap-4 rounded-[12px] border border-[#E5E3EF] bg-[#FAF9FF] p-4 sm:grid-cols-2 lg:grid-cols-4 sm:p-5">
             <label>
               <span className="mb-2 block text-xs font-bold text-[#51545F]">Search source</span>
-              <select value={searchProvider} onChange={(event) => setSearchProvider(event.target.value as typeof searchProvider)} className="focus-ring h-10 w-full rounded-[8px] border border-[#DCDDE5] bg-white px-3 text-sm">
+              <select value={searchProvider} disabled={Boolean(busy) || providersLoading} onChange={(event) => setSearchProvider(event.target.value as typeof searchProvider)} className="focus-ring h-10 w-full rounded-[8px] border border-[#DCDDE5] bg-white px-3 text-sm">
                 <option value="auto">Smart / automatic</option>
-                <option value="serper">Serper / Google</option>
-                <option value="brave">Brave Search</option>
+                {SEARCH_SOURCES.map((source) => {
+                  const connected = connectedSearch.some((item) => item.provider === source.id)
+                  return <option key={source.id} value={source.id} disabled={!connected}>{source.label}{connected ? ' — connected' : ' — connect in Settings'}</option>
+                })}
               </select>
             </label>
             <label>
@@ -298,13 +313,17 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
           </div>
         )}
 
+        {providersLoading && <p className="mt-4 text-sm text-[#777A87]">Checking connected providers…</p>}
+        {providerError && <div role="alert" className="mt-4 text-sm text-[#9D3D36]">{providerError} <button type="button" onClick={() => void refreshProviders()} className="underline">Retry</button></div>}
+        {apolloSearch && mode === 'automatic' && <p className="mt-4 rounded-[10px] bg-[#F8F6FF] p-3 text-xs leading-5 text-[#706A91]">Apollo company search uses your saved key and may consume Apollo search credits. Location filters match company headquarters. Contact/email enrichment is separate and runs only when selected; company results may have no email. API endpoint access depends on your Apollo key and account.</p>}
+
         {error && <div role="alert" className="mt-5 rounded-[10px] border border-[#F0CBC8] bg-[#FFF6F5] px-4 py-3 text-sm font-medium text-[#9D3D36]">{error}</div>}
 
-        {!automaticReady && mode === 'automatic' && (
+        {!automaticReady && !providersLoading && !providerError && mode === 'automatic' && (
           <div className="mt-6 rounded-[12px] border border-[#E2DDF8] bg-[#F8F6FF] p-4 sm:flex sm:items-center sm:justify-between sm:gap-4">
             <div>
-              <div className="text-sm font-bold text-[#43358B]">Connect a search provider first</div>
-              <p className="mt-1 text-xs leading-5 text-[#706A91]">Serper is the closest match to your Google workflow. Brave can add independent web coverage.</p>
+              <div className="text-sm font-bold text-[#43358B]">{connectedSearch.length ? 'Choose a connected search source' : 'Connect a search provider first'}</div>
+              <p className="mt-1 text-xs leading-5 text-[#706A91]">Connect Serper or Brave for web search, or Apollo for company discovery. Apollo also remains available for contact enrichment.</p>
             </div>
             <button type="button" onClick={onOpenSettings} className="focus-ring mt-3 h-9 rounded-[8px] bg-[#7B61FF] px-3.5 text-xs font-bold text-white sm:mt-0">Open Settings</button>
           </div>
@@ -320,7 +339,9 @@ export function FindLeadsPage({ getToken, onViewLeads, onOpenSettings }: Props) 
               <span className={`rounded-md px-2.5 py-1.5 text-[10px] font-extrabold uppercase tracking-[0.06em] ${job.status === 'complete' ? 'bg-[#F0F8DC] text-[#668126]' : job.status === 'failed' ? 'bg-[#FFF0EE] text-[#A34840]' : 'bg-[#F0EDFF] text-[#6D52EE]'}`}>{job.status}</span>
             </div>
             <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#E9E7F1]"><div className="h-full rounded-full bg-[#7B61FF] transition-all" style={{ width: `${Math.max(2, Math.min(100, percent))}%` }} /></div>
-            {job.result.errors && job.result.errors.length > 0 && <p className="mt-3 text-xs leading-5 text-[#8A6C41]">Some sources had issues, but the search continued where possible.</p>}
+            {job.status === 'failed' && <p role="alert" className="mt-3 text-xs leading-5 text-[#9D3D36]">{job.last_error || job.result.errors?.at(-1) || 'The search could not finish.'}</p>}
+            {job.status !== 'failed' && job.result.errors && job.result.errors.length > 0 && <p className="mt-3 text-xs leading-5 text-[#8A6C41]">{job.result.errors.join(' · ')}</p>}
+            {job.status === 'complete' && found === 0 && <p className="mt-3 text-xs leading-5 text-[#777A87]">No matching leads were returned. Try a broader niche or a location including the country.</p>}
             {pollWarning && <p className="mt-3 rounded-[8px] bg-[#FFF8E8] px-3 py-2 text-xs font-medium leading-5 text-[#82631F]">{pollWarning}</p>}
             {job.status === 'complete' && !enrichmentJobId && <button type="button" onClick={onViewLeads} className="focus-ring mt-4 inline-flex h-10 items-center gap-2 rounded-[9px] bg-[#7B61FF] px-4 text-sm font-bold text-white">View My Leads <Icon name="arrow" className="h-4 w-4" /></button>}
           </div>

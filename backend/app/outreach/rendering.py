@@ -267,8 +267,11 @@ def _host_from_url(value: object) -> str:
     raw = str(value or "").strip()
     if not raw:
         return ""
-    parsed = urlparse(raw if "://" in raw else f"https://{raw}")
-    return (parsed.hostname or "").lower()
+    try:
+        parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+        return (parsed.hostname or "").lower()
+    except ValueError:
+        return ""
 
 
 def _social_handle(value: object) -> str | None:
@@ -288,43 +291,10 @@ def _social_handle(value: object) -> str | None:
 
 
 def infer_company_name(lead: dict) -> str | None:
-    """Infer a business display name only from evidence already stored on the lead."""
-    existing = _clean_existing_company_name(lead.get("company_name"))
-    if existing:
-        return existing
+    """Use the same conservative resolver as lead cleanup, including old leads."""
+    from app.leads.smart_data import infer_company_name as resolve_company_name
 
-    # A business-owned domain is usually the strongest fallback.
-    domain_candidates = [lead.get("domain"), lead.get("website"), lead.get("source_url")]
-    for candidate in domain_candidates:
-        host = _host_from_url(candidate)
-        if not host:
-            continue
-        label = _registered_label(host)
-        if label and label not in {"facebook", "instagram", "linkedin", "google", "youtube", "yelp"}:
-            humanized = _humanize_identifier(label)
-            if humanized and humanized.lower() not in GENERIC_COMPANY_LABELS:
-                return humanized
-
-    email = str(lead.get("email") or "").strip().lower()
-    if "@" in email:
-        local, email_domain = email.rsplit("@", 1)
-        if email_domain and email_domain not in PUBLIC_EMAIL_DOMAINS:
-            humanized = _humanize_identifier(_registered_label(email_domain))
-            if humanized:
-                return humanized
-        compact_local = re.sub(r"[^a-z0-9]", "", local)
-        if compact_local and compact_local not in GENERIC_EMAIL_LOCALS and not compact_local.isdigit():
-            humanized = _humanize_identifier(local)
-            if humanized and humanized.lower() not in GENERIC_EMAIL_LOCALS:
-                return humanized
-
-    for field in ("instagram_url", "linkedin_url", "facebook_url"):
-        handle = _social_handle(lead.get(field))
-        humanized = _humanize_identifier(handle)
-        if humanized and humanized.lower() not in GENERIC_COMPANY_LABELS:
-            return humanized
-
-    return None
+    return resolve_company_name(lead)
 
 
 def resolve_template_values(lead: dict, sender: dict) -> dict[str, str]:
@@ -373,6 +343,11 @@ def resolve_template_values(lead: dict, sender: dict) -> dict[str, str]:
         "sender_name": str(sender.get("display_name") or sender.get("email") or "").strip(),
         "sender_email": str(sender.get("email") or "").strip(),
     }
+
+
+def uses_company_personalization(text: str) -> bool:
+    return any(_normalize_token(match.group(1)) in {"company_name", "greeting"}
+               for match in TOKEN.finditer(text or ""))
 
 
 def render_template(text: str, lead: dict, sender: dict) -> str:

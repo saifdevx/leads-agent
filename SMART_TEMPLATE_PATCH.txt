@@ -23,7 +23,7 @@ DATABASE
 - No migration.
 
 DEPENDENCIES
-- No new dependency.
+- No new dependency.5
 
 TEST
 - pytest -q

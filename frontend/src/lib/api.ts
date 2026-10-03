@@ -327,7 +327,7 @@ export async function startAutomatedSearch(
     niche: string
     location?: string
     target_count: number
-    search_provider: 'auto' | 'serper' | 'brave'
+    search_provider: 'auto' | 'serper' | 'brave' | 'apollo'
     ai_provider: 'auto' | 'none' | 'gemini' | 'openai'
     crawl_websites: boolean
   },

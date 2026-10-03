@@ -5,6 +5,7 @@ from dataclasses import replace
 from typing import Mapping
 from urllib.parse import unquote, urlparse
 
+from app.leads.company_names import clean_company_name, company_from_caption
 from app.leads.parser import ParsedLead, PUBLIC_EMAIL_DOMAINS, is_generic_company_name, valid_phone
 
 
@@ -65,6 +66,10 @@ COMPOUND_TERMS = {
     "homes": "Homes",
     "home": "Home",
     "group": "Group",
+    "pressure": "Pressure",
+    "pros": "Pros",
+    "roofers": "Roofers",
+    "ltd": "Ltd",
     "llc": "LLC",
     "inc": "Inc",
 }
@@ -78,7 +83,10 @@ def _host(value: object) -> str:
         parsed = urlparse(raw if "://" in raw else f"https://{raw}")
     except ValueError:
         return ""
-    return (parsed.hostname or "").lower().removeprefix("www.")
+    try:
+        return (parsed.hostname or "").lower().removeprefix("www.")
+    except ValueError:
+        return ""
 
 
 def _registered_label(hostname: str) -> str:
@@ -138,70 +146,108 @@ def _humanize(value: object) -> str | None:
     return (" ".join(words).strip() or None)
 
 
+# Shared/public websites are not evidence of a prospect-owned domain.
+NON_BUSINESS_HOSTS = SOCIAL_HOSTS | PUBLIC_EMAIL_DOMAINS | {
+    "google.com", "google.co.uk", "bing.com", "yelp.com", "yellowpages.com",
+    "linktr.ee", "bit.ly", "wa.me", "t.me", "maps.app.goo.gl", "youtu.be",
+}
+
+
+def _business_host(value: object) -> str:
+    host = _host(value)
+    if not host or "." not in host or host.replace(".", "").isdigit():
+        return ""
+    if any(host == blocked or host.endswith("." + blocked) for blocked in NON_BUSINESS_HOSTS):
+        return ""
+    return host
+
+
 def _social_handle(value: object) -> str | None:
     raw = str(value or "").strip()
     if not raw:
         return None
     try:
         parsed = urlparse(raw if "://" in raw else f"https://{raw}")
+        host = (parsed.hostname or "").lower().removeprefix("www.")
     except ValueError:
         return None
     parts = [part for part in parsed.path.strip("/").split("/") if part]
-    if not parts:
+    if not parts or host not in SOCIAL_HOSTS:
         return None
-    if parts[0].lower() in {"company", "pages", "p"} and len(parts) > 1:
+    first = parts[0].lower()
+    # A /p/ shortcode, /reel/ or /in/ person profile is not a company handle.
+    blocked = {"p", "reel", "reels", "stories", "posts", "watch", "share", "shares",
+               "groups", "events", "profile.php", "in", "pub", "shorts", "status"}
+    if first in blocked:
+        return None
+    if host == "linkedin.com":
+        if first != "company" or len(parts) < 2:
+            return None
+        candidate = parts[1]
+    elif first == "pages" and len(parts) >= 2:
         candidate = parts[1]
     else:
         candidate = parts[0]
-    candidate = candidate.split("?", 1)[0].strip()
-    if not candidate or candidate.lower() in GENERIC_SOCIAL_HANDLES or candidate.isdigit():
+    if candidate.lower() in GENERIC_SOCIAL_HANDLES or candidate.isdigit():
         return None
     return candidate
 
 
 def infer_domain(data: Mapping[str, object]) -> str | None:
-    explicit = _host(data.get("domain"))
-    if explicit and explicit not in SOCIAL_HOSTS:
-        return explicit
-
-    for field in ("website", "source_url"):
-        host = _host(data.get(field))
-        if host and host not in SOCIAL_HOSTS:
+    for field in ("domain", "website"):
+        host = _business_host(data.get(field))
+        if host:
             return host
-
     email = str(data.get("email") or "").strip().lower()
     if "@" in email:
-        domain = email.rsplit("@", 1)[1]
-        if domain and domain not in PUBLIC_EMAIL_DOMAINS:
-            return domain
-    return None
+        host = _business_host(email.rsplit("@", 1)[1])
+        if host:
+            return host
+    return _business_host(data.get("source_url")) or None
 
 
 def infer_company_name(data: Mapping[str, object]) -> str | None:
-    current = re.sub(r"\s+", " ", str(data.get("company_name") or "")).strip(" -|,")
-    if current and not is_generic_company_name(current):
-        return current[:120]
+    current = clean_company_name(data.get("company_name"))
+    if current:
+        return current
+
+    # Website/AI-prepared names are only supplied by server-side research.
+    website_name = clean_company_name(data.get("_website_company_name"))
+    if website_name:
+        return website_name
+    caption_name = company_from_caption(data.get("company_name"))
+    if caption_name:
+        return caption_name
 
     domain = infer_domain(data)
     if domain:
-        inferred = _humanize(_registered_label(domain))
-        if inferred and not is_generic_company_name(inferred):
+        inferred = clean_company_name(_humanize(_registered_label(domain)))
+        if inferred:
             return inferred
 
     email = str(data.get("email") or "").strip().lower()
     if "@" in email:
         local, email_domain = email.rsplit("@", 1)
-        compact_local = re.sub(r"[^a-z0-9]", "", local)
-        if email_domain in PUBLIC_EMAIL_DOMAINS and compact_local and compact_local not in GENERIC_EMAIL_LOCALS and not compact_local.isdigit():
-            inferred = _humanize(local)
-            if inferred and not is_generic_company_name(inferred):
-                return inferred
+        local = local.split("+", 1)[0]
+        compact = re.sub(r"[^a-z0-9]", "", local)
+        # A person's Gmail username is not a business identity. Require a
+        # business-like identifier (e.g. mpconstructionct, not john.smith).
+        business_terms = [term for term in COMPOUND_TERMS if len(term) >= 4]
+        if email_domain in PUBLIC_EMAIL_DOMAINS and any(term in compact for term in business_terms):
+            if compact not in GENERIC_EMAIL_LOCALS:
+                for suffix in sorted(GENERIC_EMAIL_LOCALS, key=len, reverse=True):
+                    stem = compact[:-len(suffix)] if compact.endswith(suffix) else ""
+                    if stem and any(term in stem for term in business_terms):
+                        local = stem
+                        break
+                inferred = clean_company_name(_humanize(local))
+                if inferred:
+                    return inferred
 
     for field in ("instagram_url", "linkedin_url", "facebook_url"):
-        inferred = _humanize(_social_handle(data.get(field)))
-        if inferred and not is_generic_company_name(inferred):
+        inferred = clean_company_name(_humanize(_social_handle(data.get(field))))
+        if inferred:
             return inferred
-
     return None
 
 
@@ -219,8 +265,11 @@ def repair_lead_row(row: Mapping[str, object], *, list_location: str | None = No
 
     current_name = str(repaired.get("company_name") or "").strip()
     inferred_name = infer_company_name(repaired)
-    if inferred_name and (not current_name or is_generic_company_name(current_name)):
-        repaired["company_name"] = inferred_name
+    if not clean_company_name(current_name):
+        # Internal evidence survives repeated read-time repair. It is not added
+        # to the public LeadResponse or written over historical DB records.
+        repaired.setdefault("_company_name_original", current_name)
+    repaired["company_name"] = inferred_name
 
     repaired["phone"] = valid_phone(str(repaired.get("phone") or "").strip() or None)
 

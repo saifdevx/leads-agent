@@ -1,0 +1,2 @@
+PASS: 25 TS/TSX files transpile without syntax diagnostics using TypeScript 5.8.3. This is NOT a type check or Vite build.
+PASS: 8 provider-selection smoke assertions executed with Node's assert (not Vitest).
